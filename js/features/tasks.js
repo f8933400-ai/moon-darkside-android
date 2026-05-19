@@ -28,7 +28,11 @@
         return Array.isArray(d.members)?d.members:[];
       }
       function taskMemberName(id){
-        return taskMembers().find(m=>m&&m.id===id)?.name||"已移除成员";
+        return taskMembers().find(m=>m&&m.id===id)?.name||`已移除${term("member")}`;
+      }
+      function taskSourceText(source){
+        if(source==="handoff")return term("handoff");
+        return sourceText[source]||source||"手动";
       }
       function normalizeTask(task){
         const source=task&&typeof task==="object"?task:{};
@@ -90,7 +94,7 @@
         if(!Array.isArray(d.tasks))d.tasks=[];
         const task=d.tasks.find(item=>item&&item.id===taskId);
         if(!task)return false;
-        if(!options.skipConfirm&&!confirm(`确定删除任务「${task.title||"未命名任务"}」吗？`))return false;
+        if(!options.skipConfirm&&!confirm(`确定删除${term("task")}「${task.title||`未命名${term("task")}`}」吗？`))return false;
         d.tasks=d.tasks.filter(item=>item&&item.id!==taskId);
         if(await save()){renderTasks(); return true;}
         return false;
@@ -111,14 +115,14 @@
       }
       function taskCard(task){
         const detail=compactTaskText(task.detail,120);
-        const linked=task.linkedHandoffId?`<span>来自交接</span>`:"";
+        const linked=task.linkedHandoffId?`<span>来自${term("handoff")}</span>`:"";
         return `<div class="task-card ${task.status==="done"?"done":""}">
           <div class="task-card-head"><strong>${taskEscape(task.title)}</strong><span class="task-status ${taskEscape(task.status)}">${taskEscape(taskStatusLabels[task.status]||task.status)}</span></div>
           ${detail?`<p>${taskEscape(detail)}</p>`:""}
           <div class="task-meta">
             <span>截止：${taskEscape(taskFormatTime(task.dueAt,"可留空"))}</span>
-            <span>成员：${taskEscape(taskMembersText(task))}</span>
-            <span>来源：${taskEscape(sourceText[task.source]||task.source||"手动")}</span>
+            <span>${taskEscape(term("member"))}：${taskEscape(taskMembersText(task))}</span>
+            <span>来源：${taskEscape(taskSourceText(task.source))}</span>
             ${linked}
             <span>创建：${taskEscape(taskFormatTime(task.createdAt,"未记录"))}</span>
             <span>更新：${taskEscape(taskFormatTime(task.updatedAt||task.createdAt,"未记录"))}</span>
@@ -135,11 +139,11 @@
         const open=tasks.filter(task=>task.status!=="done");
         const done=tasks.filter(task=>task.status==="done").sort((a,b)=>taskTimeMs(b.updatedAt||b.createdAt,0)-taskTimeMs(a.updatedAt||a.createdAt,0)).slice(0,5);
         if(!open.length&&!done.length){
-          box.innerHTML='<div class="task-empty">还没有接力任务。可以在保存交接时一并创建。</div>';
+          box.innerHTML=`<div class="task-empty">还没有${taskEscape(term("task"))}。可以在保存${taskEscape(term("handoff"))}时一并创建。</div>`;
           return;
         }
         box.innerHTML=[
-          open.length?`<div class="task-section-title">未完成</div>${open.map(taskCard).join("")}`:`<div class="task-empty">当前没有未完成任务。</div>`,
+          open.length?`<div class="task-section-title">未完成</div>${open.map(taskCard).join("")}`:`<div class="task-empty">当前没有未完成${taskEscape(term("task"))}。</div>`,
           done.length?`<div class="task-section-title">已完成（最近 5 条）</div>${done.map(taskCard).join("")}`:""
         ].filter(Boolean).join("");
       }
@@ -148,12 +152,12 @@
         if(!box)return;
         const members=taskMembers();
         if(!members.length){
-          box.innerHTML='<div class="task-empty compact">还没有成员，可先留空。</div>';
+          box.innerHTML=`<div class="task-empty compact">还没有${taskEscape(term("member"))}，可先留空。</div>`;
           return;
         }
         box.innerHTML=members.map(m=>{
           const state=typeof window.statusText==="function"?window.statusText(m.status):m.status;
-          return `<label class="task-member-row"><input type="checkbox" value="${taskEscape(m.id)}" /><span>${taskEscape(m.name||"未命名成员")}</span><small>${taskEscape(state||"")}</small></label>`;
+          return `<label class="task-member-row"><input type="checkbox" value="${taskEscape(m.id)}" /><span>${taskEscape(m.name||`未命名${term("member")}`)}</span><small>${taskEscape(state||"")}</small></label>`;
         }).join("");
       }
       function collectTaskAssignedMemberIds(containerId){

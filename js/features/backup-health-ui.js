@@ -298,6 +298,7 @@
       function openBackupHealthModal(){
         resetBackupHealthUi();
         document.body.classList.remove("drawer-open");
+        if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels();
         const modal=byId("backupHealthModal");
         if(modal)modal.style.display="flex";
       }

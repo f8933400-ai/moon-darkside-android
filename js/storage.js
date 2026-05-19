@@ -3,12 +3,18 @@
     const normalizeLedgerRecords=normalizeLedgerRecordsForBackup;
     const currentLedgerRecordsForBackup=getRuntimeLedgerRecordsForBackup;
     window.normalizeLedgerRecordsForBackup=normalizeLedgerRecordsForBackup;
+    function normalizePrefsForStorage(value){
+      const source=value&&typeof value==="object"&&!Array.isArray(value)?value:{};
+      const out={...defaultPrefs,...source};
+      out.terms=window.normalizeTerms?window.normalizeTerms(source.terms):{...DEFAULT_TERMS};
+      return out;
+    }
     class LocalStorageAdapter{
       async init(){}
       async loadAppData(){try{const raw=localStorage.getItem(KEY)||localStorage.getItem(OLD_KEY); return migrate(raw?JSON.parse(raw):JSON.parse(JSON.stringify(initial)));}catch(err){console.error("loadAppData failed",err); return migrate(JSON.parse(JSON.stringify(initial)));}}
       async saveAppData(value){try{localStorage.setItem(KEY,JSON.stringify(value)); return true;}catch(err){console.error("saveAppData failed",err); throw err;}}
-      async loadPrefs(){try{return {...defaultPrefs,...JSON.parse(localStorage.getItem(PREF_KEY)||"{}")};}catch(err){console.error("loadPrefs failed",err); return {...defaultPrefs};}}
-      async savePrefs(value){try{localStorage.setItem(PREF_KEY,JSON.stringify(value)); return true;}catch(err){console.error("savePrefs failed",err); throw err;}}
+      async loadPrefs(){try{return normalizePrefsForStorage(JSON.parse(localStorage.getItem(PREF_KEY)||"{}"));}catch(err){console.error("loadPrefs failed",err); return normalizePrefsForStorage({});}}
+      async savePrefs(value){try{localStorage.setItem(PREF_KEY,JSON.stringify(normalizePrefsForStorage(value))); return true;}catch(err){console.error("savePrefs failed",err); throw err;}}
       async loadLedger(){try{return JSON.parse(localStorage.getItem(LEDGER_KEY)||"[]");}catch(err){console.error("loadLedger failed",err); return [];}}
       async saveLedger(records){try{localStorage.setItem(LEDGER_KEY,JSON.stringify(records)); return true;}catch(err){console.error("saveLedger failed",err); throw err;}}
       async exportBackup(){return {app:"月之暗面",version:2,exportedAt:now(),nextSeq:data.nextSeq,tags:data.tags||[],messageKinds:data.messageKinds||DEFAULT_KINDS,polls:data.polls||[],handoffNotes:data.handoffNotes||[],frontingLogs:data.frontingLogs||[],tasks:data.tasks||[],careLogs:data.careLogs||[],careChecklist:data.careChecklist||[],ledgerRecords:normalizeLedgerRecordsForBackup(getRuntimeLedgerRecordsForBackup()),systemProfile:data.systemProfile||blankSystemProfile(),systemProfileVisibility:normalizeSystemProfileVisibilityRecord(data.systemProfileVisibility),memberRelations:data.memberRelations||[],externalSystemCards:data.externalSystemCards||[],rooms:data.rooms,members:data.members,messages:data.messages};}

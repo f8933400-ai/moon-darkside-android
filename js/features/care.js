@@ -30,7 +30,7 @@
       }
       function careMemberName(id){
         const d=careData();
-        return careArray(d.members).find(m=>m&&m.id===id)?.name||"未记录成员";
+        return careArray(d.members).find(m=>m&&m.id===id)?.name||`未记录${term("member")}`;
       }
       function careCurrentRoom(){
         try{
@@ -111,7 +111,7 @@
         if(!box)return;
         const d=ensureCareArrays();
         const rows=d.careLogs.slice().map(normalizeCareLogForRuntime).sort((a,b)=>careTimeMs(b.createdAt)-careTimeMs(a.createdAt)).slice(0,10);
-        box.innerHTML=rows.length?rows.map(careLogCard).join(""):'<div class="care-empty">还没有照护记录。</div>';
+        box.innerHTML=rows.length?rows.map(careLogCard).join(""):`<div class="care-empty">还没有${careEscape(term("care"))}记录。</div>`;
       }
       function renderCareChecklist(){
         const box=document.getElementById("careChecklistList");
@@ -123,7 +123,7 @@
           return careTimeMs(b.updatedAt||b.createdAt)-careTimeMs(a.updatedAt||a.createdAt);
         });
         if(!rows.length){
-          box.innerHTML='<div class="care-empty">还没有照护清单项。</div>';
+          box.innerHTML=`<div class="care-empty">还没有${careEscape(term("care"))}清单项。</div>`;
           return;
         }
         box.innerHTML=rows.map(item=>`<div class="care-check-item ${item.done?"done":""}">
@@ -142,6 +142,7 @@
         renderCareChecklist();
         const write=document.getElementById("careWriteToChat");
         if(write)write.checked=false;
+        if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels();
         if(typeof openModal==="function")openModal("careModal");
         else {
           const modal=document.getElementById("careModal");
@@ -162,7 +163,7 @@
         if(careCheckbox("careWriteToChat")){
           const r=careCurrentRoom();
           if(!r||!r.id){
-            alert("当前没有可写入的聊天，照护记录已先保存在照护板。");
+          alert(`当前没有可写入的聊天，${term("care")}记录已先保存在${term("care")}面板。`);
           }else{
             const speakerForMessage=sp||{id:"system",name:"系统记录"};
             data.messages.push(makeMessage({
@@ -185,7 +186,7 @@
       }
       async function deleteCareLog(id){
         if(!id)return;
-        if(!confirm("确认删除这条照护记录吗？"))return;
+        if(!confirm(`确认删除这条${term("care")}记录吗？`))return;
         const d=ensureCareArrays();
         const before=d.careLogs.length;
         d.careLogs=d.careLogs.filter(row=>row&&row.id!==id);
@@ -198,7 +199,7 @@
         const input=document.getElementById("careChecklistTitle");
         const title=String(input?.value||"").trim();
         if(!title){
-          alert("请先填写照护项名称。");
+          alert(`请先填写${term("care")}项名称。`);
           return;
         }
         const d=ensureCareArrays();
@@ -221,7 +222,7 @@
         const d=ensureCareArrays();
         const item=d.careChecklist.find(row=>row&&row.id===id);
         if(!item)return;
-        if(!confirm(`确认删除照护项「${item.title||"未命名照护项"}」吗？`))return;
+        if(!confirm(`确认删除${term("care")}项「${item.title||"未命名照护项"}」吗？`))return;
         d.careChecklist=d.careChecklist.filter(row=>row&&row.id!==id);
         if(await save())renderCareChecklist();
       }

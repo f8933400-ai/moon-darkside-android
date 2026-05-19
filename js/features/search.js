@@ -42,13 +42,13 @@
         try{if(typeof roomDisplayDesc==="function")return roomDisplayDesc(r);}catch{}
         return r.desc||r.description||r.note||"";
       }
-      function searchMemberName(id,fallback="已移除成员"){
+      function searchMemberName(id,fallback=`已移除${term("member")}`){
         const m=searchMemberById(id);
         return m?.name||fallback;
       }
       function searchMemberDisplayNameForMessage(message){
         if(!message)return "未知";
-        return searchMemberById(message.speakerId)?.name||message.speakerName||"已移除成员";
+        return searchMemberById(message.speakerId)?.name||message.speakerName||`已移除${term("member")}`;
       }
       function normalizeSearchText(value){
         if(value==null)return "";
@@ -78,7 +78,8 @@
         return text.length>max?`${text.slice(0,max)}...`:text;
       }
       function getSearchTypeLabel(type){
-        return searchTypeLabels[type]||"记录";
+        const dynamic={member:term("member"),room:`${term("room")} / ${term("privateRoom")}`,handoff:term("handoff"),poll:term("poll"),fronting:term("fronting"),task:term("task")};
+        return dynamic[type]||searchTypeLabels[type]||"记录";
       }
       function dateRangeBounds(filters){
         const start=filters?.startDate?new Date(`${filters.startDate}T00:00:00`).getTime():Number.NEGATIVE_INFINITY;
@@ -124,7 +125,7 @@
         const memberSelect=document.getElementById("advancedSearchMember");
         const roomSelect=document.getElementById("advancedSearchRoom");
         const kindSelect=document.getElementById("advancedSearchKind");
-        setSelectOptions(memberSelect,"全部成员",searchArray(d.members).map(m=>({value:m.id,label:m.name||"未命名成员"})),memberSelect?.value||"");
+        setSelectOptions(memberSelect,`全部${term("member")}`,searchArray(d.members).map(m=>({value:m.id,label:m.name||`未命名${term("member")}`})),memberSelect?.value||"");
         setSelectOptions(roomSelect,"全部对话",searchArray(d.rooms).map(r=>({value:r.id,label:searchRoomName(r)})),roomSelect?.value||"");
         let defaultKinds=[];
         try{defaultKinds=Array.isArray(DEFAULT_KINDS)?DEFAULT_KINDS:[];}catch{defaultKinds=[];}
@@ -251,7 +252,7 @@
           type:"member",
           id:m.id,
           timestamp:resultTimestamp([m.updatedAt,m.createdAt]),
-          title:m.name||"未命名成员",
+          title:m.name||`未命名${term("member")}`,
           meta:[m.role||"未填写角色",typeof statusText==="function"?statusText(m.status):m.status||"状态未记录"],
           summary:getSearchResultSummary(memberExtraText(m),150),
           actionLabel:"编辑"
@@ -268,11 +269,11 @@
           const isPrivate=r.type==="private";
           return {
             type:"room",
-            typeLabel:isPrivate?"私聊":"群组",
+            typeLabel:isPrivate?term("privateRoom"):term("room"),
             id:r.id,
             timestamp:resultTimestamp([r.updatedAt,r.createdAt]),
             title:searchRoomName(r),
-            meta:[isPrivate?"私聊 / 小群聊":"群组"],
+            meta:[isPrivate?`${term("privateRoom")} / 小群聊`:term("room")],
             summary:getSearchResultSummary(searchRoomDesc(r)||r.id,150),
             actionLabel:"跳转",
             roomId:r.id
@@ -294,10 +295,10 @@
           type:"handoff",
           id:n.id,
           timestamp:resultTimestamp([n.updatedAt,n.createdAt]),
-          title:n.source||"交接",
+          title:n.source||term("handoff"),
           meta:[formatSearchTime(n.createdAt),searchRoomName(n.roomId)],
           summary:getSearchResultSummary(n.text,170),
-          actionLabel:"打开交接",
+          actionLabel:`打开${term("handoff")}`,
           roomId:n.roomId
         }));
       }
@@ -332,10 +333,10 @@
           type:"poll",
           id:p.id,
           timestamp:resultTimestamp([p.updatedAt,p.closedAt,p.createdAt,p.deadline]),
-          title:p.title||"未命名投票",
+          title:p.title||`未命名${term("poll")}`,
           meta:[pollStatusText(p.status),p.deadline?`截止 ${formatSearchTime(p.deadline)}`:"未设置截止",p.roomId?searchRoomName(p.roomId):""],
           summary:getSearchResultSummary(pollResultSummary(p),170),
-          actionLabel:"打开投票",
+          actionLabel:`打开${term("poll")}`,
           roomId:p.roomId||""
         }));
       }
@@ -357,10 +358,10 @@
           type:"fronting",
           id:f.id,
           timestamp:resultTimestamp([f.updatedAt,f.endAt,f.startAt,f.createdAt]),
-          title:frontingStateLabels[f.stateType]||f.stateType||"前台",
-          meta:[frontingNamesForSearch(f)||"未记录成员",`${formatSearchTime(f.startAt||f.createdAt)} → ${f.endAt?formatSearchTime(f.endAt):"仍在进行"}`],
+          title:f.stateType==="front"?term("fronting"):f.stateType==="cofront"?term("cofronting"):f.stateType==="near"?`靠近${term("fronting")}`:frontingStateLabels[f.stateType]||f.stateType||term("fronting"),
+          meta:[frontingNamesForSearch(f)||`未记录${term("member")}`,`${formatSearchTime(f.startAt||f.createdAt)} → ${f.endAt?formatSearchTime(f.endAt):"仍在进行"}`],
           summary:getSearchResultSummary(f.note||frontingMemoryLabels[f.memoryRating]||"",170),
-          actionLabel:"打开前台日志"
+          actionLabel:`打开${term("fronting")}日志`
         }));
       }
       function taskAssignedNames(task){
@@ -383,10 +384,10 @@
           type:"task",
           id:t.id,
           timestamp:resultTimestamp([t.updatedAt,t.createdAt,t.dueAt]),
-          title:t.title||"未命名任务",
+          title:t.title||`未命名${term("task")}`,
           meta:[taskStatusLabels[t.status]||t.status||"未记录状态",t.dueAt?`截止 ${formatSearchTime(t.dueAt)}`:"截止可留空",`认领：${taskAssignedNames(t)}`],
           summary:getSearchResultSummary([t.detail,linkedHandoffText(t)].filter(Boolean).join(" "),170),
-          actionLabel:"打开任务列表"
+          actionLabel:`打开${term("task")}列表`
         }));
       }
       function collectSearchResults(filters){
@@ -476,7 +477,7 @@
           }
           if(type==="member"){
             const targetMember=searchMemberById(id);
-            if(!targetMember){alert("这个成员可能已经被删除。"); return;}
+            if(!targetMember){alert(`这个${term("member")}可能已经被删除。`); return;}
             closeAdvancedSearchModal();
             selectSearchTab("members");
             renderAfterJump(()=>{if(typeof window.editMember==="function")window.editMember(id);});
@@ -484,7 +485,7 @@
           }
           if(type==="handoff"){
             const note=searchArray(d.handoffNotes).find(n=>n&&n.id===id);
-            if(!note){alert("这条交接可能已经被删除。"); return;}
+            if(!note){alert(`这条${term("handoff")}可能已经被删除。`); return;}
             if(note.roomId&&searchRoomById(note.roomId))currentRoomId=note.roomId;
             closeAdvancedSearchModal();
             if(typeof window.openHandoffModal==="function")window.openHandoffModal();
@@ -493,7 +494,7 @@
           }
           if(type==="poll"){
             const poll=searchArray(d.polls).find(p=>p&&p.id===id);
-            if(!poll){alert("这个投票可能已经被删除。"); return;}
+            if(!poll){alert(`这个${term("poll")}可能已经被删除。`); return;}
             if(poll.roomId&&searchRoomById(poll.roomId))currentRoomId=poll.roomId;
             closeAdvancedSearchModal();
             if(typeof renderPolls==="function")renderPolls();
@@ -502,7 +503,7 @@
           }
           if(type==="fronting"){
             const log=searchArray(d.frontingLogs).find(f=>f&&f.id===id);
-            if(!log){alert("这条前台记录可能已经被删除。"); return;}
+            if(!log){alert(`这条${term("fronting")}记录可能已经被删除。`); return;}
             closeAdvancedSearchModal();
             if(typeof window.openFrontingModal==="function")window.openFrontingModal();
             else {if(typeof window.renderFrontingList==="function")window.renderFrontingList(); openModalById("frontingModal");}
@@ -510,7 +511,7 @@
           }
           if(type==="task"){
             const task=searchArray(d.tasks).find(t=>t&&t.id===id);
-            if(!task){alert("这个任务可能已经被删除。"); return;}
+            if(!task){alert(`这个${term("task")}可能已经被删除。`); return;}
             const linked=task.linkedHandoffId?searchArray(d.handoffNotes).find(n=>n&&n.id===task.linkedHandoffId):null;
             if(linked?.roomId&&searchRoomById(linked.roomId))currentRoomId=linked.roomId;
             closeAdvancedSearchModal();

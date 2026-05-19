@@ -26,7 +26,7 @@
         const text=String(value||"").replace(/\s+/g," ").trim();
         return text.length>max?`${text.slice(0,max)}...`:text;
       }
-      function arrivalMemberName(id,emptyText="已移除成员"){
+      function arrivalMemberName(id,emptyText=`已移除${term("member")}`){
         const d=arrivalData();
         return arrivalArray(d.members).find(m=>m&&m.id===id)?.name||emptyText;
       }
@@ -42,7 +42,7 @@
       }
       function arrivalStateText(value){
         if(typeof frontingStateText==="function")return frontingStateText(value);
-        return {front:"前台",cofront:"共前台",near:"靠近前台",observer:"旁观 / 在场",blended:"混合 / 模糊",unknown:"未知 / 不确定"}[value]||"前台";
+        return {front:term("fronting"),cofront:term("cofronting"),near:`靠近${term("fronting")}`,observer:"旁观 / 在场",blended:"混合 / 模糊",unknown:"未知 / 不确定"}[value]||term("fronting");
       }
       function arrivalMemoryText(value){
         if(typeof frontingMemoryText==="function")return frontingMemoryText(value);
@@ -112,7 +112,7 @@
           id:n.id||"",
           time:arrivalFormatTime(n.createdAt||n.updatedAt),
           roomName:arrivalRoomName(n.roomId),
-          source:n.source||"交接",
+          source:n.source||term("handoff"),
           text:arrivalShortText(n.text||"")
         }));
       }
@@ -132,7 +132,7 @@
         return arrivalArray(d.messages).filter(m=>m&&m.roomId===roomId&&arrivalIsDisplayMessage(m)).sort((a,b)=>arrivalTimeMs(b.createdAt)-arrivalTimeMs(a.createdAt)).slice(0,5).map(m=>({
           id:m.id||"",
           time:arrivalFormatTime(m.createdAt),
-          speakerName:typeof memberNameByMessage==="function"?memberNameByMessage(m):(arrivalMemberName(m.speakerId,m.speakerName||"已移除成员")),
+          speakerName:typeof memberNameByMessage==="function"?memberNameByMessage(m):(arrivalMemberName(m.speakerId,m.speakerName||`已移除${term("member")}`)),
           kind:m.kind||"普通",
           text:arrivalShortText(m.text||""),
           hasImage:!!(m.imageId||m.imageData)
@@ -181,7 +181,7 @@
           return arrivalTimeMs(b.updatedAt||b.closedAt||b.createdAt||b.deadline)-arrivalTimeMs(a.updatedAt||a.closedAt||a.createdAt||a.deadline);
         }).slice(0,3).map(p=>({
           id:p.id||"",
-          title:p.title||"未命名投票",
+          title:p.title||`未命名${term("poll")}`,
           statusText:arrivalPollStatusText(p.status),
           summary:arrivalPollSummary(p),
           time:arrivalFormatTime(p.updatedAt||p.closedAt||p.createdAt||p.deadline,"未记录时间")
@@ -206,10 +206,10 @@
           const memberIds=Array.isArray(task.assignedMemberIds)?task.assignedMemberIds:[task.assigneeMemberId||task.ownerMemberId||task.memberId||task.claimedBy||""].filter(Boolean);
           return {
             id:task.id||"",
-            title:task.title||task.text||task.name||"未命名任务",
+            title:task.title||task.text||task.name||`未命名${term("task")}`,
             status:arrivalTaskStatusText(task.status||"todo"),
             dueAt:task.dueAt||task.deadline||task.reviewAt||"",
-            assignee:memberIds.length?memberIds.map(id=>arrivalMemberName(id,"未记录成员")).join(" / "):"未认领"
+            assignee:memberIds.length?memberIds.map(id=>arrivalMemberName(id,`未记录${term("member")}`)).join(" / "):"未认领"
           };
         });
         return {available:true,items};
@@ -234,13 +234,13 @@
           status:status?{
             id:status.id||"",
             time:arrivalFormatTime(status.createdAt),
-            speakerName:typeof memberNameByMessage==="function"?memberNameByMessage(status):(arrivalMemberName(status.speakerId,status.speakerName||"已移除成员")),
+            speakerName:typeof memberNameByMessage==="function"?memberNameByMessage(status):(arrivalMemberName(status.speakerId,status.speakerName||`已移除${term("member")}`)),
             text:arrivalShortText(status.text||"")
           }:null,
           careLog:careLog?{
             id:careLog.id||"",
             time:arrivalFormatTime(careLog.updatedAt||careLog.createdAt||careLog.at),
-            memberName:arrivalMemberName(careLog.createdByMemberId,"未记录成员"),
+            memberName:arrivalMemberName(careLog.createdByMemberId,`未记录${term("member")}`),
             text:arrivalShortText(careSummary||careLog.summary||careLog.note||careLog.text||careLog.body||"")
           }:null
         };
@@ -248,20 +248,20 @@
 
       function renderArrivalFronting(){
         const summary=getArrivalCurrentFrontingSummary();
-        if(!summary)return arrivalSection("当前前台状态",arrivalEmpty("当前没有进行中的前台记录。可以稍后补记。"));
+        if(!summary)return arrivalSection(`当前${term("fronting")}状态`,arrivalEmpty(`当前没有进行中的${term("fronting")}记录。可以稍后补记。`));
         const chips=[
           `<span class="arrival-chip">${arrivalEscape(summary.stateText)}</span>`,
-          `<span class="arrival-chip">成员：${arrivalEscape(summary.memberText)}</span>`,
+          `<span class="arrival-chip">${arrivalEscape(term("member"))}：${arrivalEscape(summary.memberText)}</span>`,
           summary.primaryText?`<span class="arrival-chip">焦点：${arrivalEscape(summary.primaryText)}</span>`:"",
           `<span class="arrival-chip">记忆：${arrivalEscape(summary.memoryText)}</span>`
         ].filter(Boolean).join("");
         const note=summary.note?`<p>${arrivalEscape(summary.note)}</p>`:"";
-        return arrivalSection("当前前台状态",`<div class="arrival-item"><div class="arrival-chip-row">${chips}</div>${arrivalMeta([`开始：${summary.startText}`])}${note}${arrivalDeleteButton("fronting",summary.log?.id||"","删除这条前台记录")}</div>`);
+        return arrivalSection(`当前${term("fronting")}状态`,`<div class="arrival-item"><div class="arrival-chip-row">${chips}</div>${arrivalMeta([`开始：${summary.startText}`])}${note}${arrivalDeleteButton("fronting",summary.log?.id||"",`删除这条${term("fronting")}记录`)}</div>`);
       }
       function renderArrivalHandoffs(){
         const rows=getArrivalRecentHandoffs();
-        if(!rows.length)return arrivalSection("最近交接",arrivalEmpty("最近没有交接记录。"));
-        return arrivalSection("最近交接",rows.map(row=>`<div class="arrival-item">${arrivalMeta([row.time,row.roomName,row.source])}<p>${arrivalEscape(row.text||"（无正文）")}</p>${arrivalDeleteButton("handoff",row.id,"删除交接")}</div>`).join(""));
+        if(!rows.length)return arrivalSection(`最近${term("handoff")}`,arrivalEmpty(`最近没有${term("handoff")}记录。`));
+        return arrivalSection(`最近${term("handoff")}`,rows.map(row=>`<div class="arrival-item">${arrivalMeta([row.time,row.roomName,row.source])}<p>${arrivalEscape(row.text||"（无正文）")}</p>${arrivalDeleteButton("handoff",row.id,`删除${term("handoff")}`)}</div>`).join(""));
       }
       function renderArrivalMessages(){
         const rows=getArrivalRecentMessages();
@@ -273,21 +273,21 @@
       }
       function renderArrivalPolls(){
         const rows=getArrivalRecentPolls();
-        if(!rows.length)return arrivalSection("最近投票 / 决定",arrivalEmpty("最近没有投票或决定记录。"));
-        return arrivalSection("最近投票 / 决定",rows.map(row=>`<div class="arrival-item"><strong>${arrivalEscape(row.title)}</strong>${arrivalMeta([row.statusText,row.time])}<p>${arrivalEscape(row.summary)}</p>${arrivalDeleteButton("poll",row.id,"删除投票")}</div>`).join(""));
+        if(!rows.length)return arrivalSection(`最近${term("poll")} / ${term("decision")}`,arrivalEmpty(`最近没有${term("poll")}或${term("decision")}记录。`));
+        return arrivalSection(`最近${term("poll")} / ${term("decision")}`,rows.map(row=>`<div class="arrival-item"><strong>${arrivalEscape(row.title)}</strong>${arrivalMeta([row.statusText,row.time])}<p>${arrivalEscape(row.summary)}</p>${arrivalDeleteButton("poll",row.id,`删除${term("poll")}`)}</div>`).join(""));
       }
       function renderArrivalTasks(){
         const result=getArrivalOpenTasks();
-        if(!result.available)return arrivalSection("今日待办",arrivalEmpty("还没有任务模块。之后可以通过交接创建接力任务。"));
-        if(!result.items.length)return arrivalSection("今日待办",arrivalEmpty("当前没有未完成的接力任务。"));
-        return arrivalSection("今日待办",result.items.map(task=>`<div class="arrival-item"><strong>${arrivalEscape(task.title)}</strong>${arrivalMeta([`状态：${task.status}`,task.dueAt?`截止：${arrivalFormatTime(task.dueAt)}`:"未记录截止",`认领：${task.assignee}`])}${arrivalDeleteButton("task",task.id,"删除任务")}</div>`).join(""));
+        if(!result.available)return arrivalSection(term("task"),arrivalEmpty(`还没有${term("task")}模块。之后可以通过${term("handoff")}创建${term("task")}。`));
+        if(!result.items.length)return arrivalSection(term("task"),arrivalEmpty(`当前没有未完成的${term("task")}。`));
+        return arrivalSection(term("task"),result.items.map(task=>`<div class="arrival-item"><strong>${arrivalEscape(task.title)}</strong>${arrivalMeta([`状态：${task.status}`,task.dueAt?`截止：${arrivalFormatTime(task.dueAt)}`:"未记录截止",`认领：${task.assignee}`])}${arrivalDeleteButton("task",task.id,`删除${term("task")}`)}</div>`).join(""));
       }
       function renderArrivalCareSafety(){
         const summary=getArrivalCareSafetySummary();
         const safety=summary.safetyText?`<div class="arrival-item"><strong>安全提醒</strong><p>${arrivalEscape(summary.safetyText)}</p>${arrivalActionButton("clear-safety","清空安全提醒")}</div>`:`<div class="arrival-item"><strong>安全提醒</strong><p>没有设置安全提醒。</p></div>`;
         const status=summary.status?`<div class="arrival-item"><strong>最近状态</strong>${arrivalMeta([summary.status.time,summary.status.speakerName])}<p>${arrivalEscape(summary.status.text)}</p>${arrivalDeleteButton("message",summary.status.id,"删除这条状态记录")}</div>`:arrivalEmpty("最近没有状态记录。");
-        const care=summary.careLog?`<div class="arrival-item"><strong>照护记录</strong>${arrivalMeta([summary.careLog.time,summary.careLog.memberName])}<p>${arrivalEscape(summary.careLog.text||"（无摘要）")}</p>${arrivalDeleteButton("care-log",summary.careLog.id,"删除照护记录")}</div>`:"";
-        return arrivalSection("身体与安全提醒",`${safety}${status}${care}<div class="arrival-note">这里显示的是记录提醒，不是医疗建议。</div>`);
+        const care=summary.careLog?`<div class="arrival-item"><strong>${arrivalEscape(term("care"))}记录</strong>${arrivalMeta([summary.careLog.time,summary.careLog.memberName])}<p>${arrivalEscape(summary.careLog.text||"（无摘要）")}</p>${arrivalDeleteButton("care-log",summary.careLog.id,`删除${term("care")}记录`)}</div>`:"";
+        return arrivalSection(`${term("care")}与安全提醒`,`${safety}${status}${care}<div class="arrival-note">这里显示的是记录提醒，不是医疗建议。</div>`);
       }
 
       function renderArrivalManageState(){
@@ -329,7 +329,7 @@
       }
       async function deleteArrivalFrontingLog(id){
         if(!id){renderArrivalCard(); return;}
-        if(!confirm("确认删除这条前台记录吗？这不会删除成员，只会删除这条前台日志。"))return;
+        if(!confirm(`确认删除这条${term("fronting")}记录吗？这不会删除${term("member")}，只会删除这条${term("fronting")}日志。`))return;
         const d=arrivalData();
         const before=arrivalArray(d.frontingLogs).length;
         d.frontingLogs=arrivalArray(d.frontingLogs).filter(row=>row&&row.id!==id);
@@ -338,7 +338,7 @@
       }
       async function deleteArrivalHandoff(id){
         if(!id){renderArrivalCard(); return;}
-        if(!confirm("确认删除这条交接记录吗？"))return;
+        if(!confirm(`确认删除这条${term("handoff")}记录吗？`))return;
         const d=arrivalData();
         const before=arrivalArray(d.handoffNotes).length;
         d.handoffNotes=arrivalArray(d.handoffNotes).filter(row=>row&&row.id!==id);
@@ -356,7 +356,7 @@
       }
       async function deleteArrivalPoll(id){
         if(!id){renderArrivalCard(); return;}
-        if(!confirm("确认删除这个投票 / 决定记录吗？"))return;
+        if(!confirm(`确认删除这个${term("poll")} / ${term("decision")}记录吗？`))return;
         const d=arrivalData();
         const before=arrivalArray(d.polls).length;
         d.polls=arrivalArray(d.polls).filter(row=>row&&row.id!==id);
@@ -365,7 +365,7 @@
       }
       async function deleteArrivalTask(id){
         if(!id){renderArrivalCard(); return;}
-        if(!confirm("确认删除这个接力任务吗？"))return;
+        if(!confirm(`确认删除这个${term("task")}吗？`))return;
         const d=arrivalData();
         const exists=arrivalArray(d.tasks).some(row=>row&&row.id===id);
         if(!exists){renderArrivalCard(); return;}
@@ -376,7 +376,7 @@
             await arrivalRefreshAfterChange({tasks:true,full:true});
           }catch(err){
             console.error("arrival task delete failed",err);
-            alert("任务删除失败，请重试。");
+            alert(`${term("task")}删除失败，请重试。`);
           }
           return;
         }
@@ -393,7 +393,7 @@
       }
       async function deleteArrivalCareLog(id){
         if(!id){renderArrivalCard(); return;}
-        if(!confirm("确认删除这条照护记录吗？"))return;
+        if(!confirm(`确认删除这条${term("care")}记录吗？`))return;
         const d=arrivalData();
         const before=arrivalArray(d.careLogs).length;
         d.careLogs=arrivalArray(d.careLogs).filter(row=>row&&row.id!==id);
@@ -431,6 +431,7 @@
       function openArrivalModal(){
         arrivalManageMode=false;
         renderArrivalCard();
+        if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels();
         if(typeof openModal==="function")openModal("arrivalModal");
         else {
           const modal=document.getElementById("arrivalModal");

@@ -1,7 +1,7 @@
     const FRONTING_UI_STATE_TYPES=["front","cofront","near","observer","blended","unknown"];
     const FRONTING_UI_MEMORY_RATINGS=["","full","partial","none","unknown"];
     function frontingStateText(value){
-      return {front:"前台",cofront:"共前台",near:"靠近前台",observer:"旁观 / 在场",blended:"混合 / 模糊",unknown:"未知 / 不确定"}[value]||"前台";
+      return {front:term("fronting"),cofront:term("cofronting"),near:`靠近${term("fronting")}`,observer:"旁观 / 在场",blended:"混合 / 模糊",unknown:"未知 / 不确定"}[value]||term("fronting");
     }
     function frontingMemoryText(value){
       return {full:"完整",partial:"部分",none:"无",unknown:"不确定"}[value]||"未记录";
@@ -43,14 +43,14 @@
       return hours>0?`${hours}小时${rest}分`:`${minutes}分钟`;
     }
     function frontingMemberName(id){
-      return data.members.find(m=>m.id===id)?.name||"已移除";
+      return data.members.find(m=>m.id===id)?.name||`已移除${term("member")}`;
     }
-    function frontingNames(memberIds,emptyText="未记录成员"){
+    function frontingNames(memberIds,emptyText=`未记录${term("member")}`){
       const ids=Array.isArray(memberIds)?memberIds:[];
       if(!ids.length)return emptyText;
       return ids.map(frontingMemberName).join(" / ");
     }
-    function frontingNamesWithFocus(memberIds,primaryMemberId,emptyText="未记录成员"){
+    function frontingNamesWithFocus(memberIds,primaryMemberId,emptyText=`未记录${term("member")}`){
       const ids=Array.isArray(memberIds)?memberIds:[];
       if(!ids.length)return emptyText;
       const primary=primaryMemberId&&ids.includes(primaryMemberId)?primaryMemberId:null;
@@ -73,7 +73,7 @@
       const box=document.getElementById("frontingMemberPicker");
       if(!box)return;
       const selected=new Set(Array.isArray(selectedIds)?selectedIds:readSelectedFrontingMemberIds());
-      box.innerHTML=(data.members||[]).length?(data.members||[]).map(m=>`<label class="fronting-member-row"><input type="checkbox" class="fronting-member-check" value="${esc(m.id)}" ${selected.has(m.id)?"checked":""} /> <span class="fronting-member-name">${esc(m.name)}</span></label>`).join(""):'<div class="empty">还没有成员，也可以先保存无成员记录。</div>';
+      box.innerHTML=(data.members||[]).length?(data.members||[]).map(m=>`<label class="fronting-member-row"><input type="checkbox" class="fronting-member-check" value="${esc(m.id)}" ${selected.has(m.id)?"checked":""} /> <span class="fronting-member-name">${esc(m.name)}</span></label>`).join(""):`<div class="empty">还没有${esc(term("member"))}，也可以先保存无${esc(term("member"))}记录。</div>`;
       document.querySelectorAll("#frontingMemberPicker .fronting-member-check").forEach(cb=>{cb.onchange=()=>syncFrontingPrimaryOptions(readSelectedFrontingMemberIds());});
       syncFrontingPrimaryOptions([...selected]);
     }
@@ -159,7 +159,7 @@
         if(!(await save()))throw new Error("save returned false");
       }catch(err){
         console.error("fronting save failed",err);
-        alert("前台记录保存失败，请重试。");
+        alert(`${term("fronting")}记录保存失败，请重试。`);
         return;
       }
       resetFrontingForm();
@@ -175,13 +175,13 @@
     async function deleteFrontingLog(id){
       const log=(data.frontingLogs||[]).find(f=>f.id===id);
       if(!log)return;
-      if(!confirm("确定删除这条前台记录吗？此操作不可恢复。"))return;
+      if(!confirm(`确定删除这条${term("fronting")}记录吗？此操作不可恢复。`))return;
       data.frontingLogs=(data.frontingLogs||[]).filter(f=>f.id!==id);
       try{
         if(!(await save()))throw new Error("save returned false");
       }catch(err){
         console.error("fronting delete failed",err);
-        alert("前台记录删除失败，请重试。");
+        alert(`${term("fronting")}记录删除失败，请重试。`);
         return;
       }
       resetFrontingForm();
@@ -199,7 +199,7 @@
         if(!(await save()))throw new Error("save returned false");
       }catch(err){
         console.error("fronting end failed",err);
-        alert("前台记录保存失败，请重试。");
+        alert(`${term("fronting")}记录保存失败，请重试。`);
         return;
       }
       resetFrontingForm();
@@ -213,9 +213,9 @@
       if(!box)return;
       const current=getCurrentFrontingLog();
       if(current){
-        box.innerHTML=`<strong>当前记录</strong><span>${esc(frontingStateText(current.stateType))} · ${esc(frontingNamesWithFocus(current.memberIds,current.primaryMemberId,"未记录成员"))}</span><small>从 ${esc(formatFrontingTime(current.startAt))} 开始 · ${esc(formatFrontingDuration(current.startAt,null))}</small>`;
+        box.innerHTML=`<strong>当前记录</strong><span>${esc(frontingStateText(current.stateType))} · ${esc(frontingNamesWithFocus(current.memberIds,current.primaryMemberId,`未记录${term("member")}`))}</span><small>从 ${esc(formatFrontingTime(current.startAt))} 开始 · ${esc(formatFrontingDuration(current.startAt,null))}</small>`;
       } else {
-        box.innerHTML="<strong>当前记录</strong><span>没有正在进行的前台记录。</span><small>保存时结束时间留空，就会成为当前记录。</small>";
+        box.innerHTML=`<strong>当前记录</strong><span>没有正在进行的${term("fronting")}记录。</span><small>保存时结束时间留空，就会成为当前记录。</small>`;
       }
       if(endBtn){
         endBtn.disabled=!current;
@@ -233,8 +233,8 @@
         const primary=f.primaryMemberId&&ids.includes(f.primaryMemberId)?f.primaryMemberId:null;
         const endText=f.endAt?formatFrontingTime(f.endAt):"仍在进行";
         const duration=formatFrontingDuration(f.startAt,f.endAt);
-        return `<div class="fronting-log-card fronting-card"><div class="fronting-log-head"><div><div class="fronting-who">${esc(frontingNamesWithFocus(ids,primary,"未记录成员"))}</div><div class="fronting-log-meta"><span class="fronting-chip">${esc(frontingStateText(f.stateType))}</span><span>记忆：${esc(frontingMemoryText(f.memoryRating))}</span></div></div><div class="fronting-log-actions"><button class="light small" type="button" onclick="editFrontingLog('${esc(f.id)}')">编辑</button><button class="danger small" type="button" onclick="deleteFrontingLog('${esc(f.id)}')">删除</button></div></div><div class="fronting-time">${esc(formatFrontingTime(f.startAt))} → ${esc(endText)} · ${esc(duration)}</div>${f.note?`<div class="fronting-note">${esc(f.note)}</div>`:""}</div>`;
-      }).join("")+limited:'<div class="empty">还没有前台记录。</div>';
+        return `<div class="fronting-log-card fronting-card"><div class="fronting-log-head"><div><div class="fronting-who">${esc(frontingNamesWithFocus(ids,primary,`未记录${term("member")}`))}</div><div class="fronting-log-meta"><span class="fronting-chip">${esc(frontingStateText(f.stateType))}</span><span>记忆：${esc(frontingMemoryText(f.memoryRating))}</span></div></div><div class="fronting-log-actions"><button class="light small" type="button" onclick="editFrontingLog('${esc(f.id)}')">编辑</button><button class="danger small" type="button" onclick="deleteFrontingLog('${esc(f.id)}')">删除</button></div></div><div class="fronting-time">${esc(formatFrontingTime(f.startAt))} → ${esc(endText)} · ${esc(duration)}</div>${f.note?`<div class="fronting-note">${esc(f.note)}</div>`:""}</div>`;
+      }).join("")+limited:`<div class="empty">还没有${esc(term("fronting"))}记录。</div>`;
     }
     function bindFrontingControls(){
       const saveBtn=document.getElementById("frontingSaveBtn");
@@ -251,6 +251,7 @@
       resetFrontingForm();
       renderFrontingCurrent();
       renderFrontingList();
+      if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels();
       openModal("frontingModal");
     }
     async function startFronting(){

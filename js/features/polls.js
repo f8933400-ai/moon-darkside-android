@@ -136,7 +136,7 @@
       const voteMode=document.getElementById("pollVoteMode")?.value==="consensus"?"consensus":"simple";
       const deadline=document.getElementById("pollDeadline")?.value||"";
       const reviewAt=document.getElementById("pollReviewAt")?.value||"";
-      if(!title){alert("请先填写议题标题。");return;}
+      if(!title){alert(`请先填写${term("decision")}标题。`);return;}
       if(optionLines.length<2){alert("请至少填写两个选项。");return;}
       if(deadline&&new Date(deadline).getTime()<=Date.now()){alert("截止时间需要晚于现在，或留空。");return;}
       const createdAt=now();
@@ -154,7 +154,7 @@
       const sp=member(speaker.value);
       if(!poll)return;
       if(!sp){alert("请先选择一个成员身份再投票。");return;}
-      if(String(poll.status||"open")!=="open"){alert("这个议题当前不能投票。"); renderPolls(); return;}
+      if(String(poll.status||"open")!=="open"){alert(`这个${term("decision")}当前不能${term("poll")}。`); renderPolls(); return;}
       poll.votes=pollPlainObject(poll.votes)?poll.votes:{};
       poll.comments=pollPlainObject(poll.comments)?poll.comments:{};
       poll.votes[sp.id]=optionId;
@@ -184,7 +184,7 @@
     async function cancelPoll(pollId){
       const poll=getPollById(pollId);
       if(!poll)return false;
-      if(!confirm(`确定取消议题「${poll.title||"未命名议题"}」吗？\n\n已有投票和理由会保留，但它不会再作为进行中的议题。`))return false;
+      if(!confirm(`确定取消${term("decision")}「${poll.title||`未命名${term("decision")}`}」吗？\n\n已有${term("poll")}和理由会保留，但它不会再作为进行中的${term("decision")}。`))return false;
       return updatePollStatus(pollId,"cancelled");
     }
     function closePollRecord(pollOrId,manual=false,options={}){
@@ -250,7 +250,7 @@
       const id=esc(poll.id);
       const status=String(poll.status||"open");
       const buttons=[];
-      if(canVote)buttons.push(`<button class="light small" type="button" onclick="submitPollVoteFromSelection('${id}')">保存投票 / 理由</button>`);
+      if(canVote)buttons.push(`<button class="light small" type="button" onclick="submitPollVoteFromSelection('${id}')">保存${term("poll")} / 理由</button>`);
       if(status==="open"){
         buttons.push(`<button class="light small" type="button" onclick="pausePoll('${id}')">暂停</button>`);
         buttons.push(`<button class="danger small" type="button" onclick="cancelPoll('${id}')">取消</button>`);
@@ -262,7 +262,7 @@
       } else if(status==="closed") {
         buttons.push(`<button class="light small" type="button" onclick="copyPollResult('${id}')">再写入交接</button>`);
       }
-      buttons.push(`<button class="danger small" type="button" onclick="deletePoll('${id}')">删除投票</button>`);
+      buttons.push(`<button class="danger small" type="button" onclick="deletePoll('${id}')">删除${term("poll")}</button>`);
       return buttons.join("");
     }
     function renderPolls(){
@@ -274,19 +274,19 @@
         const status=String(poll.status||"open");
         const canVote=status==="open"&&!!member(activeSpeaker);
         const voted=pollVotes(poll)[activeSpeaker]||"";
-        const currentVote=voted?getPollOptionText(poll,voted):(activeSpeaker?"还没有投票":"请先选择成员");
+        const currentVote=voted?getPollOptionText(poll,voted):(activeSpeaker?`还没有${term("poll")}`:`请先选择${term("member")}`);
         const commentValue=activeSpeaker&&pollComments(poll)[activeSpeaker]?pollComments(poll)[activeSpeaker]:"";
         const statusClass=status==="paused"?"poll-paused":status==="cancelled"||status==="canceled"?"poll-cancelled":status==="closed"?"poll-closed":"";
         const description=poll.description?`<p class="poll-description">${esc(poll.description)}</p>`:"";
         const reviewDue=isPollReviewDue(poll)?'<div class="poll-review-due">需要复盘</div>':"";
         const veto=hasPollVeto(poll)?'<div class="poll-veto-note">存在否决，建议继续讨论或复盘。</div>':"";
-        const commentInput=status==="open"?`<label class="poll-comment-field">投票理由（可留空）<textarea id="${esc(pollCommentInputId(poll.id))}" placeholder="可以写这次选择的理由，也可以留空">${esc(commentValue)}</textarea></label>`:(commentValue?`<div class="poll-current-comment"><strong>你的投票理由</strong><p>${esc(commentValue)}</p></div>`:"");
+        const commentInput=status==="open"?`<label class="poll-comment-field">${term("poll")}理由（可留空）<textarea id="${esc(pollCommentInputId(poll.id))}" placeholder="可以写这次选择的理由，也可以留空">${esc(commentValue)}</textarea></label>`:(commentValue?`<div class="poll-current-comment"><strong>你的${term("poll")}理由</strong><p>${esc(commentValue)}</p></div>`:"");
         return `<div class="poll-card ${statusClass}">
           <div class="poll-card-head"><strong>${esc(poll.title||"未命名议题")}</strong><span class="poll-status-chip ${esc(status)}">${esc(pollStatusText(status))}</span></div>
           ${description}
           <div class="poll-status-row"><span class="poll-vote-mode">决策方式：${esc(pollVoteModeText(poll.voteMode))}</span><span>截止：${esc(pollDeadlineText(poll.deadline))}</span><span>复盘：${esc(pollDateTimeText(poll.reviewAt))}</span><span>${esc(getPollTotalVotes(poll))} 票</span></div>
           ${reviewDue}
-          <div class="poll-current-vote">当前成员：${esc(currentVote)}</div>
+          <div class="poll-current-vote">当前${esc(term("member"))}：${esc(currentVote)}</div>
           ${commentInput}
           <div class="poll-options">${pollOptionRowsHtml(poll,voted,canVote)}</div>
           <div class="poll-winning-summary">${esc(getPollWinningSummary(poll))}</div>
@@ -295,7 +295,7 @@
           ${veto}
           <div class="poll-actions">${pollActionButtonsHtml(poll,canVote)}</div>
         </div>`;
-      }).join(""):'<div class="empty">当前群组还没有议题 / 投票。</div>';
+      }).join(""):`<div class="empty">当前${esc(term("room"))}还没有${esc(term("decision"))} / ${esc(term("poll"))}。</div>`;
     }
     window.votePoll=votePoll;
     window.submitPollVoteFromSelection=submitPollVoteFromSelection;
@@ -303,9 +303,9 @@
     window.resumePoll=resumePoll;
     window.cancelPoll=cancelPoll;
     window.closePoll=closePoll;
-    window.finishPoll=async function(id){const poll=getPollById(id); if(!poll)return; if(!confirm("确定结束这个议题，并把结果写入聊天和交接便签吗？"))return; await closePoll(id);};
-    window.deletePoll=async function(id){const p=(data.polls||[]).find(x=>x.id===id); if(!p)return; const note=String(p.status||"open")==="open"?"\n\n这个议题还在进行中，删除后不会再结算。":"\n\n已经写入聊天或交接便签的结果不会被删除。"; if(!confirm(`确定删除议题「${p.title||"未命名议题"}」吗？${note}`))return; data.polls=(data.polls||[]).filter(x=>x.id!==id); if(await save())renderPolls();};
-    window.copyPollResult=async function(id){const p=(data.polls||[]).find(x=>x.id===id); if(!p)return; appendHandoff(formatPollDecisionSummary(p),"系统投票",p.roomId||currentRoomId); if(await save()){renderHandoff(); alert("已追加到交接便签。");}};
+    window.finishPoll=async function(id){const poll=getPollById(id); if(!poll)return; if(!confirm(`确定结束这个${term("decision")}，并把结果写入聊天和${term("handoff")}便签吗？`))return; await closePoll(id);};
+    window.deletePoll=async function(id){const p=(data.polls||[]).find(x=>x.id===id); if(!p)return; const note=String(p.status||"open")==="open"?`\n\n这个${term("decision")}还在进行中，删除后不会再结算。`:`\n\n已经写入聊天或${term("handoff")}便签的结果不会被删除。`; if(!confirm(`确定删除${term("decision")}「${p.title||`未命名${term("decision")}`}」吗？${note}`))return; data.polls=(data.polls||[]).filter(x=>x.id!==id); if(await save())renderPolls();};
+    window.copyPollResult=async function(id){const p=(data.polls||[]).find(x=>x.id===id); if(!p)return; appendHandoff(formatPollDecisionSummary(p),"系统投票",p.roomId||currentRoomId); if(await save()){renderHandoff(); alert(`已追加到${term("handoff")}便签。`);}};
     window.getPollVoteCounts=getPollVoteCounts;
     window.getPollOptionText=getPollOptionText;
     window.getPollWinningSummary=getPollWinningSummary;

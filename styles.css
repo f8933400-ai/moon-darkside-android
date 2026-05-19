@@ -282,6 +282,12 @@
     .settings-panel.active { display:block; }
     .settings-panel .font-tool { margin-top:8px; width:100%; justify-content:space-between; }
     .settings-panel .font-tool input { flex:1; width:auto; }
+    .terms-panel { min-width:0; }
+    .terms-note { margin:0 0 12px; padding:10px; border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; color:#1d4ed8; font-size:12px; line-height:1.6; }
+    .terms-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .term-input-row { min-width:0; margin:0; color:#6b7280; font-size:12px; line-height:1.5; }
+    .term-input-row input { margin-top:5px; min-width:0; }
+    .terms-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin-top:14px; }
     .backup-health-entry { display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px; align-items:center; margin-top:10px; padding:10px; border:1px solid #e5e7eb; border-radius:10px; background:#f9fafb; }
     .backup-health-entry button { white-space:nowrap; }
     .backup-health-entry span { min-width:0; color:#6b7280; font-size:12px; line-height:1.5; word-break:break-word; }
@@ -444,6 +450,8 @@
     body.dark .font-tool input { accent-color:#e5e7eb; }
     body.dark .settings-tabs button { background:#111827; color:#e5e7eb; border-color:#4b5563; }
     body.dark .settings-tabs button.active { background:#e5e7eb; color:#111827; border-color:#e5e7eb; }
+    body.dark .terms-note { background:#172554; border-color:#1d4ed8; color:#bfdbfe; }
+    body.dark .term-input-row { color:#9ca3af; }
     body.dark .backup-health-entry, body.dark .backup-health-section, body.dark .backup-health-stat, body.dark .backup-health-result, body.dark .backup-health-file { background:#111827; border-color:#4b5563; color:#d1d5db; }
     body.dark .backup-health-entry span, body.dark .backup-health-stat span, body.dark .backup-health-stat small { color:#9ca3af; }
     body.dark .backup-health-section h3, body.dark .backup-health-stat strong { color:#e5e7eb; }
@@ -481,6 +489,9 @@
       .chat-tools button { flex:1 1 auto; min-width:72px; padding:8px 10px; }
       .settings-panel .font-tool { flex:1 1 100%; }
       .settings-panel .font-tool input { width:100%; }
+      .terms-grid { grid-template-columns:1fr; }
+      .terms-actions { justify-content:stretch; }
+      .terms-actions button { flex:1 1 100%; min-width:0; }
       .backup-health-entry { grid-template-columns:1fr; align-items:stretch; }
       .backup-health-entry button { width:100%; white-space:normal; }
       .backup-health-summary { grid-template-columns:1fr; }
