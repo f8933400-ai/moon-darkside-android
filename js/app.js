@@ -17,7 +17,7 @@
     window.showRoomMenu=function(e,roomId){const r=data.rooms.find(x=>x.id===roomId); const noun=isPrivateRoom(r)?"私聊":"群组"; showMenu(e,[{label:`改名 / 修改${noun}`,action:()=>editRoom(roomId)},{label:`删除${noun}`,danger:true,action:()=>deleteRoom(roomId)}]);};
     window.showMemberMenu=function(e,memberId){showMenu(e,[{label:"打开私聊",action:()=>openPrivateWith(memberId)},{label:"编辑成员",action:()=>editMember(memberId)},{label:"删除成员",danger:true,action:()=>deleteMember(memberId)}]);};
     window.showMessageMenu=function(e,messageId){showMenu(e,[{label:"删除这条对话",danger:true,action:()=>deleteMessage(messageId)}]);};
-    window.editMember=async function(memberId){try{const m=member(memberId); if(!m)return; document.getElementById("memberModalTitle").textContent="编辑系统成员"; document.getElementById("memberId").value=m.id; document.getElementById("memberName").value=m.name||""; document.getElementById("memberStatus").value=m.status||"active"; renderTagOptions(m.tagId||""); syncTagEditor(); document.getElementById("memberRole").value=m.role||""; document.getElementById("memberNote").value=m.note||""; pendingMemberAvatar=(m.avatarId||m.avatarData)?"__KEEP__":null; setPreview("memberAvatarPreview",await resolveStoredImageUrl(m,"avatarId","avatarData"),"头像"); openModal("memberModal");}catch(err){console.error("editMember failed",err);}};
+    window.editMember=async function(memberId){try{const m=member(memberId); if(!m)return; document.getElementById("memberModalTitle").textContent="编辑系统成员"; document.getElementById("memberId").value=m.id; document.getElementById("memberName").value=m.name||""; document.getElementById("memberStatus").value=m.status||"active"; renderTagOptions(m.tagId||""); syncTagEditor(); document.getElementById("memberRole").value=m.role||""; document.getElementById("memberNote").value=m.note||""; setMemberExtraForm(m); pendingMemberAvatar=(m.avatarId||m.avatarData)?"__KEEP__":null; setPreview("memberAvatarPreview",await resolveStoredImageUrl(m,"avatarId","avatarData"),"头像"); openModal("memberModal");}catch(err){console.error("editMember failed",err);}};
     window.deleteMember=async function(memberId){const m=member(memberId); if(!m)return; const ok=confirm(`确定从成员列表删除「${m.name}」吗？\n\n建议：如果只是暂时不在、休眠或消失，可以选择“改”并把状态设为休眠/消失。\n\n删除后，过往消息会保留名字，但这个成员不能再作为发言身份。与该成员相关的成员关系也会被删除。`); if(!ok)return; data.members=data.members.filter(x=>x.id!==memberId); data.memberRelations=(data.memberRelations||[]).filter(r=>r.fromMemberId!==memberId&&r.toMemberId!==memberId); addSystemMessage(`成员变动：${m.name} 已从成员列表移除。过往记录保留。`); if(!data.members.length)speaker.innerHTML='<option value="">无可用成员</option>'; if(await save())render();};
     window.editRoom=async function(roomId){try{const r=data.rooms.find(x=>x.id===roomId); if(!r)return; setRoomModalText(isPrivateRoom(r)?"private":"group"); if(!isPrivateRoom(r))document.getElementById("roomModalTitle").textContent="编辑群组"; document.getElementById("roomId").value=r.id; document.getElementById("newRoomName").value=r.name||""; document.getElementById("newRoomDesc").value=r.desc||""; pendingRoomBg=(r.backgroundId||r.backgroundData)?"__KEEP__":null; setPreview("roomBgPreview",await resolveStoredImageUrl(r,"backgroundId","backgroundData"),"背景"); openModal("roomModal");}catch(err){console.error("editRoom failed",err);}};
     window.deleteRoom=async function(roomId){const r=data.rooms.find(x=>x.id===roomId); if(!r)return; const groupRooms=data.rooms.filter(x=>!isPrivateRoom(x)); if(!isPrivateRoom(r)&&groupRooms.length<=1){alert("至少需要保留一个群组。可以先添加新群组，再删除这个群组。");return;} const count=data.messages.filter(m=>m.roomId===roomId).length; const noun=isPrivateRoom(r)?"私聊":"群组"; const ok=confirm(`确定删除${noun}「${roomDisplayName(r)}」吗？\n\n这个${noun}里的 ${count} 条聊天记录也会一起删除。此操作不可恢复，建议先导出备份。`); if(!ok)return; data.rooms=data.rooms.filter(x=>x.id!==roomId); data.messages=data.messages.filter(m=>m.roomId!==roomId); data.polls=(data.polls||[]).filter(p=>p.roomId!==roomId); data.handoffNotes=(data.handoffNotes||[]).filter(n=>n.roomId!==roomId); if(currentRoomId===roomId)currentRoomId=(data.rooms.find(x=>!isPrivateRoom(x))||data.rooms[0])?.id||"main"; if(await save())render();};
@@ -62,6 +62,7 @@
     document.getElementById("memberTag").onchange=syncTagEditor;
     document.getElementById("saveTagBtn").onclick=saveTagFromEditor;
     document.getElementById("deleteTagBtn").onclick=deleteSelectedTag;
+    document.getElementById("addMemberCustomFieldBtn").onclick=()=>addMemberCustomFieldRow({});
     document.getElementById("chooseRoomBgBtn").onclick=()=>roomBgInput.click();
     document.getElementById("removeRoomBgBtn").onclick=()=>{pendingRoomBg=null; setPreview("roomBgPreview",null,"背景");};
     roomBgInput.onchange=()=>{const file=roomBgInput.files?.[0]; roomBgInput.value=""; readImageForCrop(file,src=>openCropper({src,aspectRatio:16/9,outputWidth:1280,outputHeight:720,quality:.82,title:"裁剪背景",mode:"contain",fillColor:"#f7f8fa",onDone:dataUrl=>{pendingRoomBg=dataUrl; setPreview("roomBgPreview",pendingRoomBg,"背景");}}));};
@@ -132,7 +133,54 @@
     document.getElementById("cancelSystemCardSaveBtn").onclick=()=>{pendingReceivedSystemCard=null; closeModal("systemCardPreviewModal");};
     document.getElementById("saveExternalSystemCardBtn").onclick=saveReceivedSystemCard;
     document.getElementById("clearHandoffBtn").onclick=async()=>{if(!confirm("确定清空当前群组的交接便签吗？"))return; data.handoffNotes=(data.handoffNotes||[]).filter(n=>n.roomId!==currentRoomId); if(await save())renderHandoff();};
-    document.getElementById("saveMemberBtn").onclick=async()=>{const memberId=document.getElementById("memberId").value; const name=document.getElementById("memberName").value.trim(); if(!name)return; const status=document.getElementById("memberStatus").value; const tagId=document.getElementById("memberTag").value; const role=document.getElementById("memberRole").value.trim(); const note=document.getElementById("memberNote").value.trim(); const applyAvatarToMember=async(m)=>{if(pendingMemberAvatar==="__KEEP__")return; if(pendingMemberAvatar===null){const oldId=m.avatarId; delete m.avatarId; delete m.avatarData; if(oldId)window.imageStore.deleteImage(oldId).catch(()=>{}); return;} const blob=window.imageStore.dataUrlToBlob(pendingMemberAvatar); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:`avatar-${m.id}`,blob,mime,name:"头像"}); m.avatarId=`avatar-${m.id}`; delete m.avatarData;}; if(memberId){const m=member(memberId); if(!m)return; const oldName=m.name; const oldStatus=m.status; m.name=name; m.status=status; m.tagId=tagId; m.role=role; m.note=note; m.updatedAt=now(); try{await applyAvatarToMember(m);}catch(err){console.error("Failed to save avatar",err); alert("头像保存失败，请重试。"); return;} if(oldName!==name||oldStatus!==status){addSystemMessage(`成员变动：${oldName} 更新为 ${name}，状态：${statusText(oldStatus)} → ${statusText(status)}。`);}} else {const newId=makeId(); const m={id:newId,name,role,status,tagId,note,createdAt:now(),updatedAt:now()}; try{await applyAvatarToMember(m);}catch(err){console.error("Failed to save avatar",err); alert("头像保存失败，请重试。"); return;} data.members.push(m); addSystemMessage(`成员变动：新增成员 ${name}，状态：${statusText(status)}。`);} if(!(await save()))return; closeModal("memberModal"); resetMemberModal(); setTab("members"); render();};
+    document.getElementById("saveMemberBtn").onclick=async()=>{
+      const memberId=document.getElementById("memberId").value;
+      const name=document.getElementById("memberName").value.trim();
+      if(!name)return;
+      const status=document.getElementById("memberStatus").value;
+      const tagId=document.getElementById("memberTag").value;
+      const role=document.getElementById("memberRole").value.trim();
+      const note=document.getElementById("memberNote").value.trim();
+      const extra=collectMemberExtraFormValues();
+      const applyAvatarToMember=async(m)=>{
+        if(pendingMemberAvatar==="__KEEP__")return;
+        if(pendingMemberAvatar===null){
+          const oldId=m.avatarId;
+          delete m.avatarId;
+          delete m.avatarData;
+          if(oldId)window.imageStore.deleteImage(oldId).catch(()=>{});
+          return;
+        }
+        const blob=window.imageStore.dataUrlToBlob(pendingMemberAvatar);
+        const mime=blob.type||"image/*";
+        await window.imageStore.putImage({id:`avatar-${m.id}`,blob,mime,name:"头像"});
+        m.avatarId=`avatar-${m.id}`;
+        delete m.avatarData;
+      };
+      if(memberId){
+        const m=member(memberId);
+        if(!m)return;
+        const oldName=m.name;
+        const oldStatus=m.status||"";
+        const savedAt=now();
+        const statusHistory=normalizeMemberStatusHistory(m.statusHistory);
+        Object.assign(m,{name,status,tagId,role,note,...extra,statusHistory,updatedAt:savedAt});
+        if(oldStatus!==status)m.statusHistory.push({fromStatus:oldStatus,toStatus:status,note:"",createdAt:savedAt});
+        try{await applyAvatarToMember(m);}catch(err){console.error("Failed to save avatar",err); alert("头像保存失败，请重试。"); return;}
+        if(oldName!==name||oldStatus!==status){addSystemMessage(`成员变动：${oldName} 更新为 ${name}，状态：${statusText(oldStatus)} → ${statusText(status)}。`);}
+      } else {
+        const savedAt=now();
+        const m=normalizeMemberRecord({id:makeId(),name,role,status,tagId,note,...extra,statusHistory:[],createdAt:savedAt,updatedAt:savedAt});
+        try{await applyAvatarToMember(m);}catch(err){console.error("Failed to save avatar",err); alert("头像保存失败，请重试。"); return;}
+        data.members.push(m);
+        addSystemMessage(`成员变动：新增成员 ${name}，状态：${statusText(status)}。`);
+      }
+      if(!(await save()))return;
+      closeModal("memberModal");
+      resetMemberModal();
+      setTab("members");
+      render();
+    };
     document.getElementById("createPrivateBtn").onclick=createPrivateRoom;
     document.getElementById("saveRoomBtn").onclick=async()=>{const roomId=document.getElementById("roomId").value; const name=document.getElementById("newRoomName").value.trim(); if(!name)return; const desc=document.getElementById("newRoomDesc").value.trim(); const applyBgToRoom=async(r)=>{if(pendingRoomBg==="__KEEP__")return; if(pendingRoomBg===null){const oldId=r.backgroundId; delete r.backgroundId; delete r.backgroundData; if(oldId)window.imageStore.deleteImage(oldId).catch(()=>{}); return;} const blob=window.imageStore.dataUrlToBlob(pendingRoomBg); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:`roombg-${r.id}`,blob,mime,name:"背景"}); r.backgroundId=`roombg-${r.id}`; delete r.backgroundData;}; if(roomId){const r=data.rooms.find(x=>x.id===roomId); if(!r)return; r.name=name; r.desc=desc; try{await applyBgToRoom(r);}catch(err){console.error("Failed to save room background",err); alert("背景保存失败，请重试。"); return;}} else {const newRoom={id:makeId(),type:"group",memberIds:[],name,desc,createdAt:now()}; try{await applyBgToRoom(newRoom);}catch(err){console.error("Failed to save room background",err); alert("背景保存失败，请重试。"); return;} data.rooms.push(newRoom); currentRoomId=newRoom.id;} if(!(await save()))return; resetRoomModal(); closeModal("roomModal"); render();};
     document.getElementById("saveDailyBtn").onclick=async()=>{const front=document.getElementById("frontNow").value.trim()||"未填写"; const mood=document.getElementById("bodyMood").value.trim()||"未填写"; const note=document.getElementById("dailyNote").value.trim()||"无"; const sp=member(speaker.value)||data.members[0]; data.messages.push(makeMessage({roomId:currentRoomId,speakerId:sp?.id||"system",speakerName:sp?.name||"系统记录",kind:"状态",text:`今日状态\n当前靠前/在场：${front}\n身体与情绪：${mood}\n提醒：${note}`})); if(!(await save()))return; document.getElementById("frontNow").value=""; document.getElementById("bodyMood").value=""; document.getElementById("dailyNote").value=""; closeModal("dailyModal"); render();};
