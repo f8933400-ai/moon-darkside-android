@@ -493,6 +493,10 @@
 	    body.dark .fronting-chip { background:#312e81; color:#e0e7ff; border-color:#4338ca; }
 	    .arrival-modal { width:min(780px,100%); max-height:min(92dvh,860px); }
 	    .arrival-intro { font-size:13px; line-height:1.6; color:#6b7280; background:#f9fafb; border:1px solid #eef0f3; border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+	    .arrival-manage-row { display:flex; justify-content:flex-end; gap:8px; margin:-2px 0 8px; }
+	    .arrival-manage-note { margin:0 0 10px; padding:8px 10px; border:1px solid #fecaca; border-radius:8px; background:#fef2f2; color:#991b1b; font-size:12px; line-height:1.5; }
+	    .arrival-manage-note[hidden] { display:none; }
+	    .arrival-manage-on .arrival-section { border-color:#fecaca; }
 	    .arrival-time { color:#374151; font-size:13px; font-weight:600; margin:8px 0 12px; }
 	    .arrival-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 	    .arrival-section { min-width:0; border:1px solid #e5e7eb; border-radius:8px; background:#fff; padding:10px; display:grid; gap:8px; align-content:start; }
@@ -500,6 +504,8 @@
 	    .arrival-item { min-width:0; padding:9px 10px; border:1px solid #eef0f3; border-radius:8px; background:#f9fafb; }
 	    .arrival-item strong { display:block; margin-bottom:4px; font-size:13px; color:#111827; }
 	    .arrival-item p { margin:4px 0 0; color:#4b5563; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+	    .arrival-item-actions { display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap; margin-top:8px; }
+	    .arrival-item-actions button { flex:0 1 auto; }
 	    .arrival-meta { color:#6b7280; font-size:12px; line-height:1.45; margin:2px 0; }
 	    .arrival-empty { color:#6b7280; font-size:13px; line-height:1.55; padding:8px 0; }
 	    .arrival-actions { position:sticky; bottom:-18px; background:linear-gradient(180deg, rgba(255,255,255,.88), #fff 35%); padding-top:12px; }
@@ -507,6 +513,8 @@
 	    .arrival-chip { display:inline-flex; align-items:center; min-height:22px; padding:2px 8px; border-radius:999px; background:#ecfdf5; color:#065f46; border:1px solid #bbf7d0; font-size:12px; line-height:1.4; max-width:100%; }
 	    .arrival-note { color:#6b7280; font-size:12px; line-height:1.5; padding-top:2px; }
 	    body.dark .arrival-intro, body.dark .arrival-item { background:#111827; border-color:#374151; color:#d1d5db; }
+	    body.dark .arrival-manage-note { background:#450a0a; border-color:#7f1d1d; color:#fecaca; }
+	    body.dark .arrival-manage-on .arrival-section { border-color:#7f1d1d; }
 	    body.dark .arrival-time, body.dark .arrival-section-title, body.dark .arrival-item strong { color:#e5e7eb; }
 	    body.dark .arrival-section { background:#1f2937; border-color:#4b5563; }
 	    body.dark .arrival-item p { color:#d1d5db; }
@@ -521,6 +529,10 @@
 	      .fronting-editor-actions button { flex:1 1 42%; }
 	      .fronting-member-picker { max-height:160px; }
 	      .arrival-grid { grid-template-columns:1fr; }
+	      .arrival-manage-row { justify-content:stretch; }
+	      .arrival-manage-row button { flex:1; }
+	      .arrival-item-actions { justify-content:stretch; }
+	      .arrival-item-actions button { flex:1 1 100%; min-width:0; }
 	      .arrival-actions { justify-content:stretch; }
 	      .arrival-actions button { flex:1 1 100%; }
 	    }

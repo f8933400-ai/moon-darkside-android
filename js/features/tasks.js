@@ -85,14 +85,15 @@
       function completeTask(taskId){return updateTaskStatus(taskId,"done");}
       function pauseTask(taskId){return updateTaskStatus(taskId,"paused");}
       function resumeTask(taskId){return updateTaskStatus(taskId,"todo");}
-      async function deleteTask(taskId){
+      async function deleteTask(taskId,options={}){
         const d=taskData();
         if(!Array.isArray(d.tasks))d.tasks=[];
         const task=d.tasks.find(item=>item&&item.id===taskId);
-        if(!task)return;
-        if(!confirm(`确定删除任务「${task.title||"未命名任务"}」吗？`))return;
+        if(!task)return false;
+        if(!options.skipConfirm&&!confirm(`确定删除任务「${task.title||"未命名任务"}」吗？`))return false;
         d.tasks=d.tasks.filter(item=>item&&item.id!==taskId);
-        if(await save())renderTasks();
+        if(await save()){renderTasks(); return true;}
+        return false;
       }
       function taskMembersText(task){
         const ids=Array.isArray(task.assignedMemberIds)?task.assignedMemberIds:[];
