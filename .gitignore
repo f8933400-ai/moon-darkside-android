@@ -1,0 +1,15 @@
+.DS_Store
+*.zip
+*.log
+*.bak
+*.tmp
+backups/
+exports/
+*.local.json
+backupBeforeImageMigration*.json
+node_modules/
+dist/
+build/
+coverage/
+.vscode/
+.idea/
