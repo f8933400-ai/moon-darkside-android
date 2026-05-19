@@ -116,6 +116,29 @@
     document.getElementById("pollBtn").onclick=()=>{if(typeof ensurePollFormDefaults==="function")ensurePollFormDefaults(); else if(!document.getElementById("pollDeadline").value){const d=new Date(Date.now()+60*60*1000); d.setSeconds(0,0); document.getElementById("pollDeadline").value=d.toISOString().slice(0,16);} renderPolls(); openModal("pollModal");};
     const frontingBtn=document.getElementById("frontingBtn"); if(frontingBtn)frontingBtn.onclick=openFrontingModal;
     const arrivalBtn=document.getElementById("arrivalBtn"); if(arrivalBtn)arrivalBtn.onclick=()=>window.openArrivalModal&&window.openArrivalModal();
+    const careBtn=document.getElementById("careBtn"); if(careBtn)careBtn.onclick=()=>window.openCareModal&&window.openCareModal();
+    const saveCareLogBtn=document.getElementById("saveCareLogBtn"); if(saveCareLogBtn)saveCareLogBtn.onclick=()=>window.saveCareLog&&window.saveCareLog();
+    const addCareChecklistBtn=document.getElementById("addCareChecklistBtn"); if(addCareChecklistBtn)addCareChecklistBtn.onclick=()=>window.addCareChecklistItem&&window.addCareChecklistItem();
+    const careChecklistTitle=document.getElementById("careChecklistTitle"); if(careChecklistTitle)careChecklistTitle.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault(); window.addCareChecklistItem&&window.addCareChecklistItem();}});
+    const careChecklistList=document.getElementById("careChecklistList");
+    if(careChecklistList){
+      careChecklistList.addEventListener("change",e=>{
+        const input=e.target.closest("[data-care-check-toggle]");
+        if(!input||!careChecklistList.contains(input))return;
+        window.toggleCareChecklistItem&&window.toggleCareChecklistItem(input.dataset.careCheckToggle,!!input.checked);
+      });
+      careChecklistList.addEventListener("click",e=>{
+        const btn=e.target.closest("[data-care-check-delete]");
+        if(!btn||!careChecklistList.contains(btn))return;
+        window.deleteCareChecklistItem&&window.deleteCareChecklistItem(btn.dataset.careCheckDelete);
+      });
+    }
+    const careLogList=document.getElementById("careLogList");
+    if(careLogList)careLogList.addEventListener("click",e=>{
+      const btn=e.target.closest("[data-care-log-delete]");
+      if(!btn||!careLogList.contains(btn))return;
+      window.deleteCareLog&&window.deleteCareLog(btn.dataset.careLogDelete);
+    });
     const frontingStartBtn=document.getElementById("frontingStartBtn"); if(frontingStartBtn)frontingStartBtn.onclick=startFronting;
     const frontingSaveBtn=document.getElementById("frontingSaveBtn"); if(frontingSaveBtn)frontingSaveBtn.onclick=saveFrontingLogFromForm;
     const frontingCancelEditBtn=document.getElementById("frontingCancelEditBtn"); if(frontingCancelEditBtn)frontingCancelEditBtn.onclick=resetFrontingForm;

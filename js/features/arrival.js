@@ -223,7 +223,12 @@
         const currentRoomStatus=messages.filter(m=>m.roomId===roomId).sort((a,b)=>arrivalTimeMs(b.createdAt)-arrivalTimeMs(a.createdAt))[0]||null;
         const globalStatus=messages.sort((a,b)=>arrivalTimeMs(b.createdAt)-arrivalTimeMs(a.createdAt))[0]||null;
         const status=currentRoomStatus||globalStatus;
-        const careLog=arrivalArray(d.careLogs).filter(Boolean).sort((a,b)=>arrivalTimeMs(b.updatedAt||b.createdAt||b.at)-arrivalTimeMs(a.updatedAt||a.createdAt||a.at))[0]||null;
+        let careLog=null;
+        if(typeof window.getLatestCareLog==="function"){
+          try{careLog=window.getLatestCareLog();}catch(err){console.warn("arrival latest care log failed",err);}
+        }
+        if(!careLog)careLog=arrivalArray(d.careLogs).filter(Boolean).sort((a,b)=>arrivalTimeMs(b.updatedAt||b.createdAt||b.at)-arrivalTimeMs(a.updatedAt||a.createdAt||a.at))[0]||null;
+        const careSummary=careLog?(typeof window.summarizeCareLog==="function"?window.summarizeCareLog(careLog):""):"";
         return {
           safetyText:safetyNotes?arrivalShortText(safetyNotes):"",
           status:status?{
@@ -235,7 +240,8 @@
           careLog:careLog?{
             id:careLog.id||"",
             time:arrivalFormatTime(careLog.updatedAt||careLog.createdAt||careLog.at),
-            text:arrivalShortText(careLog.summary||careLog.note||careLog.text||careLog.body||"")
+            memberName:arrivalMemberName(careLog.createdByMemberId,"未记录成员"),
+            text:arrivalShortText(careSummary||careLog.summary||careLog.note||careLog.text||careLog.body||"")
           }:null
         };
       }
@@ -280,7 +286,7 @@
         const summary=getArrivalCareSafetySummary();
         const safety=summary.safetyText?`<div class="arrival-item"><strong>安全提醒</strong><p>${arrivalEscape(summary.safetyText)}</p>${arrivalActionButton("clear-safety","清空安全提醒")}</div>`:`<div class="arrival-item"><strong>安全提醒</strong><p>没有设置安全提醒。</p></div>`;
         const status=summary.status?`<div class="arrival-item"><strong>最近状态</strong>${arrivalMeta([summary.status.time,summary.status.speakerName])}<p>${arrivalEscape(summary.status.text)}</p>${arrivalDeleteButton("message",summary.status.id,"删除这条状态记录")}</div>`:arrivalEmpty("最近没有状态记录。");
-        const care=summary.careLog?`<div class="arrival-item"><strong>照护记录</strong>${arrivalMeta([summary.careLog.time])}<p>${arrivalEscape(summary.careLog.text||"（无摘要）")}</p>${arrivalDeleteButton("care-log",summary.careLog.id,"删除照护记录")}</div>`:"";
+        const care=summary.careLog?`<div class="arrival-item"><strong>照护记录</strong>${arrivalMeta([summary.careLog.time,summary.careLog.memberName])}<p>${arrivalEscape(summary.careLog.text||"（无摘要）")}</p>${arrivalDeleteButton("care-log",summary.careLog.id,"删除照护记录")}</div>`:"";
         return arrivalSection("身体与安全提醒",`${safety}${status}${care}<div class="arrival-note">这里显示的是记录提醒，不是医疗建议。</div>`);
       }
 
@@ -302,6 +308,7 @@
           if(options.handoff&&typeof renderHandoff==="function")renderHandoff();
           if(options.polls&&typeof renderPolls==="function")renderPolls();
           if(options.tasks&&typeof renderTasks==="function")renderTasks();
+          if(options.care&&typeof renderCareLogs==="function")renderCareLogs();
           if(options.systemProfile&&typeof renderSystemProfile==="function")renderSystemProfile();
           if(options.full&&typeof render==="function")await render();
           renderArrivalCard();
@@ -345,7 +352,7 @@
         const before=arrivalArray(d.messages).length;
         d.messages=arrivalArray(d.messages).filter(row=>row&&row.id!==id);
         if(d.messages.length===before){renderArrivalCard(); return;}
-        await arrivalSaveAndRefresh({full:true});
+        await arrivalSaveAndRefresh({care:true,full:true});
       }
       async function deleteArrivalPoll(id){
         if(!id){renderArrivalCard(); return;}
