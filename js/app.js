@@ -129,7 +129,7 @@
     document.getElementById("saveSystemProfileBtn").onclick=saveSystemProfile;
     document.getElementById("saveRelationBtn").onclick=saveRelation;
     document.getElementById("resetRelationBtn").onclick=resetRelationForm;
-    document.getElementById("cardFieldMembers").onchange=e=>{document.getElementById("cardMemberBox").style.display=e.target.checked?"block":"none";};
+    document.querySelectorAll("#systemCardPanel .card-options input").forEach(input=>{input.onchange=e=>{pendingSystemCardImage=null; if(e.target.id==="cardFieldMembers")document.getElementById("cardMemberBox").style.display=e.target.checked?"block":"none";};});
     document.getElementById("previewSystemCardBtn").onclick=()=>makeSystemCardImage();
     document.getElementById("saveSystemCardImageBtn").onclick=saveSystemCardImage;
     document.getElementById("chooseSystemCardBgBtn").onclick=()=>document.getElementById("systemCardBgInput").click();
@@ -198,6 +198,8 @@
     document.getElementById("saveDailyBtn").onclick=async()=>{const front=document.getElementById("frontNow").value.trim()||"未填写"; const mood=document.getElementById("bodyMood").value.trim()||"未填写"; const note=document.getElementById("dailyNote").value.trim()||"无"; const sp=member(speaker.value)||data.members[0]; data.messages.push(makeMessage({roomId:currentRoomId,speakerId:sp?.id||"system",speakerName:sp?.name||"系统记录",kind:"状态",text:`今日状态\n当前靠前/在场：${front}\n身体与情绪：${mood}\n提醒：${note}`})); if(!(await save()))return; document.getElementById("frontNow").value=""; document.getElementById("bodyMood").value=""; document.getElementById("dailyNote").value=""; closeModal("dailyModal"); render();};
     document.getElementById("exportBtn").onclick=()=>{closeModal("settingsModal"); openExportModal();};
     document.getElementById("exportScope").onchange=updateExportRoomPicker;
+    document.getElementById("exportRedacted").onchange=e=>{if(e.target.checked){document.getElementById("exportExcludePrivate").checked=true;} updateRedactionControls();};
+    document.getElementById("exportFormat").onchange=updateRedactionControls;
     document.getElementById("confirmExportBtn").onclick=()=>downloadExport().catch(err=>{console.error("导出失败",err); alert("导出失败："+(err.message||err));});
     document.getElementById("importBtn").onclick=()=>importInput.click();
     importInput.onchange=()=>{const file=importInput.files?.[0]; importInput.value=""; importBackupFile(file);};
