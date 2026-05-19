@@ -113,7 +113,7 @@
     themeBtn.onclick=async()=>{prefs.dark=!prefs.dark; applyPrefs(); await savePrefs();};
     document.getElementById("message").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("messageForm").requestSubmit();}});
     document.getElementById("addMemberBtn").onclick=()=>{resetMemberModal();openModal("memberModal");}; document.getElementById("addRoomBtn").onclick=()=>{resetRoomModal();openModal("roomModal");}; document.getElementById("addPrivateBtn").onclick=()=>openPrivateModal(); document.getElementById("dailyBtn").onclick=()=>openModal("dailyModal"); document.getElementById("roomBgQuickBtn").onclick=()=>editRoom(currentRoomId);
-    document.getElementById("pollBtn").onclick=()=>{if(!document.getElementById("pollDeadline").value){const d=new Date(Date.now()+60*60*1000); d.setSeconds(0,0); document.getElementById("pollDeadline").value=d.toISOString().slice(0,16);} renderPolls(); openModal("pollModal");};
+    document.getElementById("pollBtn").onclick=()=>{if(typeof ensurePollFormDefaults==="function")ensurePollFormDefaults(); else if(!document.getElementById("pollDeadline").value){const d=new Date(Date.now()+60*60*1000); d.setSeconds(0,0); document.getElementById("pollDeadline").value=d.toISOString().slice(0,16);} renderPolls(); openModal("pollModal");};
     const frontingBtn=document.getElementById("frontingBtn"); if(frontingBtn)frontingBtn.onclick=openFrontingModal;
     const arrivalBtn=document.getElementById("arrivalBtn"); if(arrivalBtn)arrivalBtn.onclick=()=>window.openArrivalModal&&window.openArrivalModal();
     const frontingStartBtn=document.getElementById("frontingStartBtn"); if(frontingStartBtn)frontingStartBtn.onclick=startFronting;
