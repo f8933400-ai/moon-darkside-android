@@ -50,6 +50,18 @@
     document.querySelectorAll(".settings-tabs button").forEach(btn=>btn.onclick=()=>{const modal=btn.closest(".modal")||document; modal.querySelectorAll(".settings-tabs button").forEach(x=>x.classList.remove("active")); modal.querySelectorAll(".settings-panel").forEach(x=>x.classList.remove("active")); btn.classList.add("active"); document.getElementById(btn.dataset.panel).classList.add("active");});
     function setTab(next){tab=next; document.getElementById("tabRooms").classList.toggle("active",tab==="rooms"); document.getElementById("tabPrivate").classList.toggle("active",tab==="private"); document.getElementById("tabMembers").classList.toggle("active",tab==="members"); renderList();}
     document.getElementById("tabRooms").onclick=()=>setTab("rooms"); document.getElementById("tabPrivate").onclick=()=>setTab("private"); document.getElementById("tabMembers").onclick=()=>setTab("members"); search.oninput=renderList;
+    const advancedSearchBtn=document.getElementById("advancedSearchBtn");
+    const advancedSearchRunBtn=document.getElementById("advancedSearchRunBtn");
+    const advancedSearchResetBtn=document.getElementById("advancedSearchResetBtn");
+    const advancedSearchCloseBtn=document.getElementById("advancedSearchCloseBtn");
+    const advancedSearchResults=document.getElementById("advancedSearchResults");
+    const advancedSearchKeyword=document.getElementById("advancedSearchKeyword");
+    if(advancedSearchBtn)advancedSearchBtn.onclick=()=>window.openAdvancedSearchModal&&window.openAdvancedSearchModal();
+    if(advancedSearchRunBtn)advancedSearchRunBtn.onclick=()=>{if(!window.collectAdvancedSearchFilters||!window.collectSearchResults||!window.renderAdvancedSearchResults)return; const filters=window.collectAdvancedSearchFilters(); const results=window.collectSearchResults(filters); window.renderAdvancedSearchResults(results);};
+    if(advancedSearchResetBtn)advancedSearchResetBtn.onclick=()=>window.resetAdvancedSearchFilters&&window.resetAdvancedSearchFilters();
+    if(advancedSearchCloseBtn)advancedSearchCloseBtn.onclick=()=>window.closeAdvancedSearchModal&&window.closeAdvancedSearchModal();
+    if(advancedSearchKeyword)advancedSearchKeyword.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault(); advancedSearchRunBtn?.click();}});
+    if(advancedSearchResults)advancedSearchResults.addEventListener("click",e=>{const btn=e.target.closest("[data-search-type][data-search-id]"); if(!btn||!advancedSearchResults.contains(btn))return; window.jumpToSearchResult&&window.jumpToSearchResult(btn.dataset.searchType,btn.dataset.searchId);});
     document.getElementById("kindManageBtn").onclick=()=>{renderKindManager(); openModal("kindModal");};
     document.getElementById("saveKindBtn").onclick=saveKind;
     document.getElementById("deleteKindBtn").onclick=()=>deleteKind(kind.value);
