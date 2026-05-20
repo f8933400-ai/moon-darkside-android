@@ -6,6 +6,19 @@
 
 本版本仍然是 local-only / offline-first：没有云同步、账号、遥测、CDN、npm、构建步骤或远程 API。
 
+## P3-04 加密备份补充
+
+P3-04 增加了可选的加密完整 JSON 备份：
+
+- 导出格式新增“加密完整 JSON 备份”，文件建议后缀为 `.moonenc.json`。
+- 加密使用浏览器 Web Crypto API，在本机完成 PBKDF2 / AES-GCM，不联网，不引入第三方加密库。
+- 加密前仍复用完整 JSON hydrate 流程，外置图片会先补回导出副本里的 DataURL。
+- 加密 envelope 只包含 `app/kind/version/kdf/cipher/payload` 等元信息和密文，不包含明文 JSON、密码或密钥。
+- 密码不会保存到 `localStorage`，也不会写入备份文件。忘记密码后无法恢复加密备份。
+- 加密只保护导出的备份文件，不会加密当前浏览器里的本机 `localStorage`、账本记录或 IndexedDB 图片库。
+- 普通 JSON 备份仍可用。导入加密备份成功后，解密出的普通完整 JSON 会走现有导入流程，图片仍会 externalize 回 IndexedDB。
+- 仍建议至少保留一份安全保存的备份，并谨慎分享任何完整备份。
+
 ## P0-P2 已完成功能
 
 P0 阶段：
@@ -50,6 +63,7 @@ P2 阶段：
 - 图片保存在 IndexedDB：`moon-images` / `images`。
 - 旧备份中的 `imageData/avatarData/backgroundData` 导入后会 externalize 到 IndexedDB。
 - 完整 JSON 导出会 hydrate 图片 DataURL，以便单文件备份。
+- 可选加密备份会加密 hydrate 后的完整 JSON 导出副本；普通 JSON 路径保持可用。
 - `messageIntegrity` 规则没有在本版本发布验证中改动。
 - visibility / 隐私桶只影响应用内展示和导出，不是加密隔离。
 
@@ -61,6 +75,7 @@ P2 阶段：
 - localStorage 仍是主结构化数据存储；数据量极大时可能需要 IndexedDB / SQLite 结构化迁移。
 - 没有虚拟滚动；消息或时间线特别多时，DOM 可能变重。
 - visibility / 隐私桶不是加密隔离。
+- 加密备份只保护导出的备份文件，不保护当前浏览器本地存储；忘记备份密码无法恢复。
 - 复盘报告脱敏不是 NLP 脱敏，导出前需要人工检查敏感信息。
 - 照护板不是医疗建议、治疗建议或危机干预。
 - 时间线 / 月度回顾只是本地记录统计，不代表状态判断或诊断。
