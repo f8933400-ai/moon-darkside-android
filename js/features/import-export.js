@@ -470,7 +470,57 @@
       clearEncryptedBackupPasswordFields();
       updateEncryptedBackupOptionsVisibility();
     }
-    async function externalizeImagesAfterJsonImport(appData,options={}){const keepBadIntegrity=options.keepBadIntegrityMessages instanceof Set?options.keepBadIntegrityMessages:new Set(); for(const m of appData.messages||[]){if(m.imageData){const imageId=m.imageId||`msgimg-${m.id}`; const blob=window.imageStore.dataUrlToBlob(m.imageData); const mime=m.imageType||blob.type||"image/*"; await window.imageStore.putImage({id:imageId,blob,mime,name:m.imageName||"图片"}); m.imageId=imageId; delete m.imageData;}else if(m.imageId){const blob=await window.imageStore.getImageBlob(m.imageId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: imageId not found in IndexedDB",m.imageId);}} for(const mb of appData.members||[]){if(mb.avatarData){const avatarId=mb.avatarId||`avatar-${mb.id}`; const blob=window.imageStore.dataUrlToBlob(mb.avatarData); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:avatarId,blob,mime,name:`${mb.name||"member"}-头像`}); mb.avatarId=avatarId; delete mb.avatarData;}else if(mb.avatarId){const blob=await window.imageStore.getImageBlob(mb.avatarId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: avatarId not found in IndexedDB",mb.avatarId);}} for(const r of appData.rooms||[]){if(r.backgroundData){const backgroundId=r.backgroundId||`roombg-${r.id}`; const blob=window.imageStore.dataUrlToBlob(r.backgroundData); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:backgroundId,blob,mime,name:`${r.name||r.id||"room"}-背景`}); r.backgroundId=backgroundId; delete r.backgroundData;}else if(r.backgroundId){const blob=await window.imageStore.getImageBlob(r.backgroundId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: backgroundId not found in IndexedDB",r.backgroundId);}} /* JSON 导入把 DataURL 外置到 IndexedDB：imageData(_imgVer:1) → imageId(_imgVer:2)，正常消息按现有规则重算 integrity；原备份已异常的消息保留异常状态。 */ for(const m of appData.messages||[]){if(!keepBadIntegrity.has(m))m.integrity=messageIntegrity(m);}}
+    function makeImportImageId(prefix,sourceId){
+      const raw=String(sourceId||"unknown");
+      const safe=raw.replace(/[^A-Za-z0-9_.-]+/g,"_").slice(0,80)||"unknown";
+      const random=crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2);
+      return `${prefix}-import-${safe}-${Date.now()}-${random}`;
+    }
+    async function putImportedImage(prefix,sourceId,dataUrl,options){
+      const imageId=makeImportImageId(prefix,sourceId);
+      const blob=window.imageStore.dataUrlToBlob(dataUrl);
+      await window.imageStore.putImage({id:imageId,blob,mime:options.mime||blob.type||"image/*",name:options.name||"图片"});
+      if(Array.isArray(options.createdImageIds))options.createdImageIds.push(imageId);
+      return imageId;
+    }
+    async function externalizeImagesAfterJsonImport(appData,options={}){
+      const keepBadIntegrity=options.keepBadIntegrityMessages instanceof Set?options.keepBadIntegrityMessages:new Set();
+      const createdImageIds=Array.isArray(options.createdImageIds)?options.createdImageIds:null;
+      for(const m of appData.messages||[]){
+        if(m.imageData){
+          const imageId=await putImportedImage("msgimg",m.id,m.imageData,{createdImageIds,mime:m.imageType||"",name:m.imageName||"图片"});
+          m.imageId=imageId;
+          delete m.imageData;
+        }else if(m.imageId){
+          const blob=await window.imageStore.getImageBlob(m.imageId).catch(()=>null);
+          if(!blob)console.warn("externalizeImagesAfterJsonImport: imageId not found in IndexedDB",m.imageId);
+        }
+      }
+      for(const mb of appData.members||[]){
+        if(mb.avatarData){
+          const avatarId=await putImportedImage("avatar",mb.id,mb.avatarData,{createdImageIds,name:`${mb.name||"member"}-头像`});
+          mb.avatarId=avatarId;
+          delete mb.avatarData;
+        }else if(mb.avatarId){
+          const blob=await window.imageStore.getImageBlob(mb.avatarId).catch(()=>null);
+          if(!blob)console.warn("externalizeImagesAfterJsonImport: avatarId not found in IndexedDB",mb.avatarId);
+        }
+      }
+      for(const r of appData.rooms||[]){
+        if(r.backgroundData){
+          const backgroundId=await putImportedImage("roombg",r.id,r.backgroundData,{createdImageIds,name:`${r.name||r.id||"room"}-背景`});
+          r.backgroundId=backgroundId;
+          delete r.backgroundData;
+        }else if(r.backgroundId){
+          const blob=await window.imageStore.getImageBlob(r.backgroundId).catch(()=>null);
+          if(!blob)console.warn("externalizeImagesAfterJsonImport: backgroundId not found in IndexedDB",r.backgroundId);
+        }
+      }
+      /* JSON 导入把 DataURL 外置到 IndexedDB：imageData(_imgVer:1) → imageId(_imgVer:2)，正常消息按现有规则重算 integrity；原备份已异常的消息保留异常状态。 */
+      for(const m of appData.messages||[]){
+        if(!keepBadIntegrity.has(m))m.integrity=messageIntegrity(m);
+      }
+    }
     async function importParsedBackup(parsed){
       const incoming=await storage.importBackup(parsed);
       const hasLegacyLedger=Array.isArray(parsed?.ledgerRecords);
@@ -480,11 +530,27 @@
       const note=bad?`\n\n注意：备份中有 ${bad} 条消息校验异常，仍可导入。导入后这些消息会保留为校验异常，请确认来源。`:"";
       const ledgerNote=hasLegacyLedger?"\n\n检测到旧版备份里包含账本数据。本次只导入主记录数据，不会自动覆盖当前账本。":"";
       if(!confirm(`导入会覆盖当前本机数据。\n\n备份包含 ${incoming.rooms.length} 个群组、${incoming.members.length} 个成员、${incoming.messages.length} 条消息。${ledgerNote}${note}\n\n确定导入吗？`))return false;
-      await externalizeImagesAfterJsonImport(incoming,{keepBadIntegrityMessages:badIntegritySet});
-      const previousData=data, previousRoomId=currentRoomId;
+      const snapshot=cloneAppStateForRollback();
+      const createdImageIds=[];
+      try{
+        await externalizeImagesAfterJsonImport(incoming,{keepBadIntegrityMessages:badIntegritySet,createdImageIds});
+      }catch(err){
+        console.error("importParsedBackup: image externalize failed",err);
+        await cleanupImagesBestEffort(createdImageIds);
+        restoreAppStateFromRollback(snapshot);
+        render();
+        alert("导入失败，已尽量恢复原数据和图片状态。");
+        return false;
+      }
       data=incoming;
       currentRoomId=data.rooms[0]?.id||"main";
-      if(!(await save())){data=previousData; currentRoomId=previousRoomId; render(); return false;}
+      if(!(await save())){
+        await cleanupImagesBestEffort(createdImageIds);
+        restoreAppStateFromRollback(snapshot);
+        render();
+        alert("导入失败，已尽量恢复原数据和图片状态。");
+        return false;
+      }
       closeModal("exportModal");
       resetEncryptedImportControls();
       render();

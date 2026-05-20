@@ -63,9 +63,15 @@
         return {ok:true,created:true,existing:false};
       }
 
-      async function migrateOne(kind,item,id,dataUrl,mime,name){
+      async function cleanupMigrationImagesBestEffort(ids=[]){
+        const unique=[...new Set((ids||[]).filter(Boolean))];
+        await Promise.all(unique.map(id=>imageStore.deleteImage(id).catch(err=>console.warn("image migration cleanup failed",id,err))));
+      }
+
+      async function migrateOne(kind,item,id,dataUrl,mime,name,createdImageIds){
         const blob=imageStore.dataUrlToBlob(dataUrl);
         await imageStore.putImage({id,blob,mime:mime||blob.type||"image/*",name:name||"图片"});
+        if(Array.isArray(createdImageIds))createdImageIds.push(id);
         if(kind==="message"){
           item.imageId=id;
           delete item.imageData;
@@ -84,6 +90,8 @@
         if(preview.totalImages===0)return {ok:true,migrated:{messageImages:0,memberAvatars:0,roomBackgrounds:0,totalImages:0},jsonLengthBefore:preview.jsonLengthBefore,jsonLengthAfter:preview.jsonLengthBefore,reducedChars:0,reducedRatio:0};
         const dataSnapshot=JSON.stringify(data);
         const jsonLengthBefore=dataSnapshot.length;
+        const createdImageIds=[];
+        let mainDataSaved=false;
         try{
           backupMainData(options);
           const migrated={messageImages:0,memberAvatars:0,roomBackgrounds:0,totalImages:0};
@@ -91,7 +99,7 @@
             if(!m.imageData||m.imageId)continue;
             const id=`msgimg-${m.id}`;
             try{
-              await migrateOne("message",m,id,m.imageData,m.imageType||"",""+(m.imageName||"图片"));
+              await migrateOne("message",m,id,m.imageData,m.imageType||"",""+(m.imageName||"图片"),createdImageIds);
               migrated.messageImages+=1;
             }catch(err){
               throw {reason:"message_image_failed",error:err,failedItem:{type:"message",id:m.id,imageId:id}};
@@ -103,6 +111,7 @@
             try{
               const blob=imageStore.dataUrlToBlob(mem.avatarData);
               await imageStore.putImage({id,blob,mime:blob.type||"image/*",name:`${mem.name||"member"}-头像`});
+              createdImageIds.push(id);
               mem.avatarId=id;
               delete mem.avatarData;
               migrated.memberAvatars+=1;
@@ -116,6 +125,7 @@
             try{
               const blob=imageStore.dataUrlToBlob(r.backgroundData);
               await imageStore.putImage({id,blob,mime:blob.type||"image/*",name:`${r.name||r.id||"room"}-背景`});
+              createdImageIds.push(id);
               r.backgroundId=id;
               delete r.backgroundData;
               migrated.roomBackgrounds+=1;
@@ -126,6 +136,7 @@
           migrated.totalImages=migrated.messageImages+migrated.memberAvatars+migrated.roomBackgrounds;
           (data.messages||[]).forEach(m=>{m.integrity=messageIntegrity(m);});
           if(!(await save()))throw new Error("save_failed");
+          mainDataSaved=true;
           localStorage.setItem(DONE_KEY,"1");
           localStorage.setItem(AT_KEY,now());
           localStorage.setItem(VERSION_KEY,"1");
@@ -134,7 +145,12 @@
           console.log("image migration completed",result);
           return result;
         }catch(err){
-          try{data=JSON.parse(dataSnapshot);}catch(restoreErr){console.error("image migration memory restore failed",restoreErr);}
+          if(!mainDataSaved){
+            try{data=JSON.parse(dataSnapshot);}catch(restoreErr){console.error("image migration memory restore failed",restoreErr);}
+            await cleanupMigrationImagesBestEffort(createdImageIds);
+          }else{
+            console.warn("image migration failed after main data save; keeping migrated image blobs",err);
+          }
           const reason=err?.reason||"migration_failed";
           const error=err?.error||err;
           const failedItem=err?.failedItem||null;

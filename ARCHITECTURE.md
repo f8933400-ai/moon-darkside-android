@@ -264,7 +264,7 @@ JSON 导入路径：
 ```text
 importBackupFile(file)
   -> storage.importBackup(parsed)
-  -> externalizeImagesAfterJsonImport(incoming, { keepBadIntegrityMessages })
+  -> externalizeImagesAfterJsonImport(incoming, { keepBadIntegrityMessages, createdImageIds })
   -> data = incoming
   -> save()
   -> render()
@@ -272,12 +272,12 @@ importBackupFile(file)
 
 导入规则：
 
-- 如果导入 JSON 中有 `imageData`，写入 IndexedDB，设置 `imageId`，删除 `imageData`。
-- 如果有 `avatarData`，写入 IndexedDB，设置 `avatarId`，删除 `avatarData`。
-- 如果有 `backgroundData`，写入 IndexedDB，设置 `backgroundId`，删除 `backgroundData`。
-- 如果新版 JSON 同时包含 ID 和 DataURL，优先用 DataURL 恢复同 ID 图片。
+- 如果导入 JSON 中有 `imageData`，写入 IndexedDB，设置新的唯一 import `imageId`，删除 `imageData`。
+- 如果有 `avatarData`，写入 IndexedDB，设置新的唯一 import `avatarId`，删除 `avatarData`。
+- 如果有 `backgroundData`，写入 IndexedDB，设置新的唯一 import `backgroundId`，删除 `backgroundData`。
+- 如果新版 JSON 同时包含 ID 和 DataURL，优先用 DataURL 恢复为新的 import 图片 ID，避免覆盖本机已有同名图片。
 - `externalizeImagesAfterJsonImport()` 完成后会按现有规则重算原本校验正常的消息 `integrity`；原备份中已经校验异常的消息不会被静默重算成正常。
-- JSON 导入失败不会覆盖当前 `data`。
+- JSON 导入失败不会覆盖当前 `data`，并会 best-effort 删除本次导入新增的图片。
 - 如果旧版主记录备份中存在 `ledgerRecords`，主记录导入只提示，不会自动覆盖当前账本。
 
 P5-03 验收确认完整 JSON / encrypted-json 能恢复成员头像、房间背景和聊天图片；导出 hydrate 不改变运行时 data 或 IndexedDB 图片，导入 externalize 后主 data 不长期保留大体积 DataURL。

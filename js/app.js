@@ -9,12 +9,37 @@
     function cancelLongPress(){if(longPressTimer){clearTimeout(longPressTimer); longPressTimer=null;}}
     function openDrawer(){document.body.classList.add("drawer-open");}
     function closeDrawer(){document.body.classList.remove("drawer-open");}
-    function cloneAppStateForRollback(){return {data:JSON.parse(JSON.stringify(data)),currentRoomId};}
-    function restoreAppStateFromRollback(snapshot){if(!snapshot)return; data=JSON.parse(JSON.stringify(snapshot.data)); currentRoomId=snapshot.currentRoomId||data.rooms?.[0]?.id||"main";}
+    function cloneAppStateForRollback(){return {data:JSON.parse(JSON.stringify(data)),prefs:JSON.parse(JSON.stringify(prefs||{})),currentRoomId,tab};}
+    function restoreAppStateFromRollback(snapshot){if(!snapshot)return; data=JSON.parse(JSON.stringify(snapshot.data)); if(snapshot.prefs)prefs=JSON.parse(JSON.stringify(snapshot.prefs)); currentRoomId=snapshot.currentRoomId||data.rooms?.[0]?.id||"main"; if(snapshot.tab)tab=snapshot.tab;}
     function makeStoredImageId(prefix){return `${prefix}-${makeId()}`;}
     async function cleanupImagesBestEffort(ids=[]){const unique=[...new Set((ids||[]).filter(Boolean))]; const store=window.imageStore; if(!store?.deleteImage)return; await Promise.all(unique.map(id=>store.deleteImage(id).catch(err=>console.warn("image cleanup failed",id,err))));}
     function imageIdStillReferenced(id){return !!id&&((data.messages||[]).some(m=>m.imageId===id)||(data.members||[]).some(m=>m.avatarId===id)||(data.rooms||[]).some(r=>r.backgroundId===id));}
     async function cleanupUnreferencedImagesBestEffort(ids=[]){await cleanupImagesBestEffort((ids||[]).filter(id=>!imageIdStillReferenced(id)));}
+    function cleanupDeletedMemberReferences(memberId){
+      data.memberRelations=(data.memberRelations||[]).filter(r=>r.fromMemberId!==memberId&&r.toMemberId!==memberId);
+      (data.tasks||[]).forEach(task=>{
+        if(Array.isArray(task.assignedMemberIds))task.assignedMemberIds=task.assignedMemberIds.filter(id=>id!==memberId);
+      });
+      (data.polls||[]).forEach(poll=>{
+        if(poll&&poll.votes&&typeof poll.votes==="object"&&!Array.isArray(poll.votes))delete poll.votes[memberId];
+        if(poll&&poll.comments&&typeof poll.comments==="object"&&!Array.isArray(poll.comments))delete poll.comments[memberId];
+      });
+      (data.frontingLogs||[]).forEach(log=>{
+        if(!log)return;
+        if(Array.isArray(log.memberIds))log.memberIds=log.memberIds.filter(id=>id!==memberId);
+        if(log.primaryMemberId===memberId)log.primaryMemberId=Array.isArray(log.memberIds)&&log.memberIds.length?log.memberIds[0]:null;
+      });
+      (data.rooms||[]).forEach(r=>{
+        if(isPrivateRoom(r)&&Array.isArray(r.memberIds))r.memberIds=r.memberIds.filter(id=>id!==memberId);
+      });
+    }
+    function collectRoomDeletionImageIds(roomId){
+      const ids=[];
+      const r=data.rooms.find(x=>x.id===roomId);
+      if(r?.backgroundId)ids.push(r.backgroundId);
+      (data.messages||[]).forEach(m=>{if(m.roomId===roomId&&m.imageId)ids.push(m.imageId);});
+      return ids;
+    }
     window.selectRoom=function(id){const r=data.rooms.find(x=>x.id===id); currentRoomId=id; if(r&&isPrivateRoom(r))maybeShowPrivateRoomNotice(); render(); closeDrawer();}; window.closeModal=function(id){document.getElementById(id).style.display="none";}; function openModal(id){closeDrawer(); closeMenu(); document.getElementById(id).style.display="flex";}
     function setAppMode(mode){appMode=mode; prefs.lastAppMode=mode; if(prefs.resetToCover===false)safeSavePrefs("记录应用模式"); applyAppMode();}
     function applyAppMode(){const cover=appMode!=="journal"; const app=document.querySelector(".app"); document.getElementById("coverApp").style.display=cover?"flex":"none"; app.style.display=cover?"none":""; document.getElementById("disclaimerBackdrop").style.display=cover?"none":"flex"; document.getElementById("lockBackdrop").style.display="none"; if(cover){renderLedger();} else {startDisclaimer(); startLock();}}
@@ -24,10 +49,72 @@
     window.showMemberMenu=function(e,memberId){showMenu(e,[{label:`打开${term("privateRoom")}`,action:()=>openPrivateWith(memberId)},{label:`编辑${term("member")}`,action:()=>editMember(memberId)},{label:`删除${term("member")}`,danger:true,action:()=>deleteMember(memberId)}]);};
     window.showMessageMenu=function(e,messageId){showMenu(e,[{label:"删除这条对话",danger:true,action:()=>deleteMessage(messageId)}]);};
     window.editMember=async function(memberId){try{const m=member(memberId); if(!m)return; document.getElementById("memberModalTitle").textContent=`编辑${term("member")}`; document.getElementById("memberId").value=m.id; document.getElementById("memberName").value=m.name||""; document.getElementById("memberStatus").value=m.status||"active"; renderTagOptions(m.tagId||""); syncTagEditor(); document.getElementById("memberRole").value=m.role||""; document.getElementById("memberNote").value=m.note||""; setMemberExtraForm(m); pendingMemberAvatar=(m.avatarId||m.avatarData)?"__KEEP__":null; setPreview("memberAvatarPreview",await resolveStoredImageUrl(m,"avatarId","avatarData"),"头像"); if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels(); openModal("memberModal");}catch(err){console.error("editMember failed",err);}};
-    window.deleteMember=async function(memberId){const m=member(memberId); if(!m)return; const ok=confirm(`确定从成员列表删除「${m.name}」吗？\n\n建议：如果只是暂时不在、休眠或消失，可以选择“改”并把状态设为休眠/消失。\n\n删除后，过往消息会保留名字，但这个成员不能再作为发言身份。与该成员相关的成员关系也会被删除。`); if(!ok)return; data.members=data.members.filter(x=>x.id!==memberId); data.memberRelations=(data.memberRelations||[]).filter(r=>r.fromMemberId!==memberId&&r.toMemberId!==memberId); addSystemMessage(`成员变动：${m.name} 已从成员列表移除。过往记录保留。`); if(!data.members.length)speaker.innerHTML='<option value="">无可用成员</option>'; if(await save())render();};
+    window.deleteMember=async function(memberId){
+      const m=member(memberId);
+      if(!m)return;
+      const ok=confirm(`确定从成员列表删除「${m.name}」吗？\n\n建议：如果只是暂时不在、休眠或消失，可以选择“改”并把状态设为休眠/消失。\n\n删除后，过往消息会保留名字，但这个成员不能再作为发言身份。与该成员相关的成员关系也会被删除。`);
+      if(!ok)return;
+      const snapshot=cloneAppStateForRollback();
+      const avatarId=m.avatarId||"";
+      data.members=data.members.filter(x=>x.id!==memberId);
+      cleanupDeletedMemberReferences(memberId);
+      addSystemMessage(`成员变动：${m.name} 已从成员列表移除。过往记录保留。`);
+      if(!data.members.length)speaker.innerHTML='<option value="">无可用成员</option>';
+      if(!(await save())){
+        restoreAppStateFromRollback(snapshot);
+        render();
+        alert("保存失败，已恢复原状态。");
+        return;
+      }
+      await cleanupUnreferencedImagesBestEffort([avatarId]);
+      render();
+    };
     window.editRoom=async function(roomId){try{const r=data.rooms.find(x=>x.id===roomId); if(!r)return; setRoomModalText(isPrivateRoom(r)?"private":"group"); document.getElementById("roomModalTitle").textContent=`编辑${isPrivateRoom(r)?term("privateRoom"):term("room")}`; document.getElementById("roomId").value=r.id; document.getElementById("newRoomName").value=r.name||""; document.getElementById("newRoomDesc").value=r.desc||""; pendingRoomBg=(r.backgroundId||r.backgroundData)?"__KEEP__":null; setPreview("roomBgPreview",await resolveStoredImageUrl(r,"backgroundId","backgroundData"),"背景"); if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels(); openModal("roomModal");}catch(err){console.error("editRoom failed",err);}};
-    window.deleteRoom=async function(roomId){const r=data.rooms.find(x=>x.id===roomId); if(!r)return; const groupRooms=data.rooms.filter(x=>!isPrivateRoom(x)); if(!isPrivateRoom(r)&&groupRooms.length<=1){alert(`至少需要保留一个${term("room")}。可以先添加新${term("room")}，再删除这个${term("room")}。`);return;} const count=data.messages.filter(m=>m.roomId===roomId).length; const noun=isPrivateRoom(r)?term("privateRoom"):term("room"); const ok=confirm(`确定删除${noun}「${roomDisplayName(r)}」吗？\n\n这个${noun}里的 ${count} 条聊天记录也会一起删除。此操作不可恢复，建议先导出备份。`); if(!ok)return; data.rooms=data.rooms.filter(x=>x.id!==roomId); data.messages=data.messages.filter(m=>m.roomId!==roomId); resetNextSeqFromMessages(); data.polls=(data.polls||[]).filter(p=>p.roomId!==roomId); data.handoffNotes=(data.handoffNotes||[]).filter(n=>n.roomId!==roomId); if(currentRoomId===roomId)currentRoomId=(data.rooms.find(x=>!isPrivateRoom(x))||data.rooms[0])?.id||"main"; if(await save())render();};
-    window.deleteMessage=async function(messageId){const m=data.messages.find(x=>x.id===messageId); if(!m)return; if(!confirm("确定删除这条对话吗？此操作不可恢复。"))return; data.messages=data.messages.filter(x=>x.id!==messageId); resetNextSeqFromMessages(); if(await save())render();};
+    window.deleteRoom=async function(roomId){
+      const r=data.rooms.find(x=>x.id===roomId);
+      if(!r)return;
+      const groupRooms=data.rooms.filter(x=>!isPrivateRoom(x));
+      if(!isPrivateRoom(r)&&groupRooms.length<=1){alert(`至少需要保留一个${term("room")}。可以先添加新${term("room")}，再删除这个${term("room")}。`);return;}
+      const count=data.messages.filter(m=>m.roomId===roomId).length;
+      const noun=isPrivateRoom(r)?term("privateRoom"):term("room");
+      const ok=confirm(`确定删除${noun}「${roomDisplayName(r)}」吗？\n\n这个${noun}里的 ${count} 条聊天记录也会一起删除。此操作不可恢复，建议先导出备份。`);
+      if(!ok)return;
+      const snapshot=cloneAppStateForRollback();
+      const imageIdsToDelete=collectRoomDeletionImageIds(roomId);
+      const removedHandoffIds=new Set((data.handoffNotes||[]).filter(n=>n.roomId===roomId).map(n=>n.id).filter(Boolean));
+      data.rooms=data.rooms.filter(x=>x.id!==roomId);
+      data.messages=data.messages.filter(m=>m.roomId!==roomId);
+      resetNextSeqFromMessages();
+      data.polls=(data.polls||[]).filter(p=>p.roomId!==roomId);
+      data.handoffNotes=(data.handoffNotes||[]).filter(n=>n.roomId!==roomId);
+      (data.tasks||[]).forEach(task=>{if(removedHandoffIds.has(task.linkedHandoffId))task.linkedHandoffId="";});
+      if(currentRoomId===roomId)currentRoomId=(data.rooms.find(x=>!isPrivateRoom(x))||data.rooms[0])?.id||"main";
+      if(!(await save())){
+        restoreAppStateFromRollback(snapshot);
+        render();
+        alert("保存失败，已恢复原状态。");
+        return;
+      }
+      await cleanupUnreferencedImagesBestEffort(imageIdsToDelete);
+      render();
+    };
+    window.deleteMessage=async function(messageId){
+      const m=data.messages.find(x=>x.id===messageId);
+      if(!m)return;
+      if(!confirm("确定删除这条对话吗？此操作不可恢复。"))return;
+      const snapshot=cloneAppStateForRollback();
+      const imageId=m.imageId||"";
+      data.messages=data.messages.filter(x=>x.id!==messageId);
+      resetNextSeqFromMessages();
+      if(!(await save())){
+        restoreAppStateFromRollback(snapshot);
+        render();
+        alert("保存失败，已恢复原状态。");
+        return;
+      }
+      await cleanupUnreferencedImagesBestEffort([imageId]);
+      render();
+    };
     document.addEventListener("click",closeMenu); document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu();}); window.addEventListener("resize",closeMenu);
     drawerBtn.onclick=openDrawer; drawerBackdrop.onclick=closeDrawer; document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();});
     function openSettingsModal(){if(typeof populateTermsSettings==="function")populateTermsSettings(); if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels(); openModal("settingsModal");}
@@ -390,7 +477,58 @@
     document.getElementById("biometricUnlockBtn").onclick=requestBiometricUnlock;
     document.getElementById("unlockPassword").addEventListener("keydown",e=>{if(e.key==="Enter")unlockWithPassword();});
     document.getElementById("clearBtn").onclick=()=>{closeModal("settingsModal"); document.getElementById("clearMessages").checked=false; document.getElementById("clearMembers").checked=false; document.getElementById("clearRooms").checked=false; openModal("clearModal");};
-    document.getElementById("confirmClearBtn").onclick=async()=>{const clearMessages=document.getElementById("clearMessages").checked; const clearMembers=document.getElementById("clearMembers").checked; const clearRooms=document.getElementById("clearRooms").checked; if(!clearMessages&&!clearMembers&&!clearRooms){alert("请先选择要清空的内容。");return;} const targets=[]; if(clearMessages)targets.push("聊天记录"); if(clearMembers)targets.push("成员栏"); if(clearRooms)targets.push("群组（含私聊 / 小群聊）"); if(!confirm(`确定清空：${targets.join("、")}？\n\n此操作不可恢复，建议先导出备份。`))return; if(clearRooms&&!clearMessages&&!confirm("你没有勾选清空聊天记录，但清空群组会删除不再存在群组里的聊天记录，只保留默认群组中的记录。\n\n是否继续清空群组？"))return; if(clearMessages){data.messages=[]; resetNextSeqFromMessages();} if(clearRooms){data.rooms=JSON.parse(JSON.stringify(initial.rooms)); currentRoomId=data.rooms[0].id; if(!clearMessages){data.messages=data.messages.filter(m=>m.roomId===currentRoomId); resetNextSeqFromMessages();}} if(clearMembers){data.members=JSON.parse(JSON.stringify(initial.members)); data.memberRelations=[]; prefs.currentViewMemberId=""; await savePrefs(); if(!clearMessages)addSystemMessage("成员栏已清空，并恢复默认记录身份。"); tab="members"; document.getElementById("tabMembers").classList.add("active"); document.getElementById("tabRooms").classList.remove("active");} if(clearRooms&&!clearMessages)addSystemMessage("群组已清空，并恢复默认群组。"); currentRoomId=room()?.id||data.rooms[0]?.id||"main"; if(!(await save()))return; closeModal("clearModal"); render();};
+    document.getElementById("confirmClearBtn").onclick=async()=>{
+      const clearMessages=document.getElementById("clearMessages").checked;
+      const clearMembers=document.getElementById("clearMembers").checked;
+      const clearRooms=document.getElementById("clearRooms").checked;
+      if(!clearMessages&&!clearMembers&&!clearRooms){alert("请先选择要清空的内容。");return;}
+      const targets=[];
+      if(clearMessages)targets.push("聊天记录");
+      if(clearMembers)targets.push("成员栏");
+      if(clearRooms)targets.push("群组（含私聊 / 小群聊）");
+      if(!confirm(`确定清空：${targets.join("、")}？\n\n此操作不可恢复，建议先导出备份。`))return;
+      if(clearRooms&&!clearMessages&&!confirm("你没有勾选清空聊天记录，但清空群组会删除不再存在群组里的聊天记录，只保留默认群组中的记录。\n\n是否继续清空群组？"))return;
+      const snapshot=cloneAppStateForRollback();
+      const imageIdsToDelete=[];
+      const resetRoomId=initial.rooms?.[0]?.id||"main";
+      if(clearMessages)(data.messages||[]).forEach(m=>{if(m.imageId)imageIdsToDelete.push(m.imageId);});
+      if(clearRooms){
+        (data.rooms||[]).forEach(r=>{if(r.backgroundId)imageIdsToDelete.push(r.backgroundId);});
+        if(!clearMessages)(data.messages||[]).forEach(m=>{if(m.roomId!==resetRoomId&&m.imageId)imageIdsToDelete.push(m.imageId);});
+      }
+      if(clearMembers)(data.members||[]).forEach(m=>{if(m.avatarId)imageIdsToDelete.push(m.avatarId);});
+      let shouldSavePrefs=false;
+      if(clearMessages){data.messages=[]; resetNextSeqFromMessages();}
+      if(clearRooms){
+        data.rooms=JSON.parse(JSON.stringify(initial.rooms));
+        currentRoomId=data.rooms[0].id;
+        if(!clearMessages){data.messages=data.messages.filter(m=>m.roomId===currentRoomId); resetNextSeqFromMessages();}
+      }
+      if(clearMembers){
+        data.members=JSON.parse(JSON.stringify(initial.members));
+        data.memberRelations=[];
+        prefs.currentViewMemberId="";
+        shouldSavePrefs=true;
+        if(!clearMessages)addSystemMessage("成员栏已清空，并恢复默认记录身份。");
+        tab="members";
+      }
+      if(clearRooms&&!clearMessages)addSystemMessage("群组已清空，并恢复默认群组。");
+      currentRoomId=room()?.id||data.rooms[0]?.id||"main";
+      if(!(await save())){
+        restoreAppStateFromRollback(snapshot);
+        render();
+        alert("保存失败，已恢复原状态。");
+        return;
+      }
+      if(shouldSavePrefs)await savePrefs();
+      await cleanupUnreferencedImagesBestEffort(imageIdsToDelete);
+      if(clearMembers){
+        document.getElementById("tabMembers").classList.add("active");
+        document.getElementById("tabRooms").classList.remove("active");
+      }
+      closeModal("clearModal");
+      render();
+    };
     function b64uEnc(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
     function b64uDec(s){s=String(s).replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4)s+="="; const bin=atob(s); const buf=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i); return buf.buffer;}
     async function webauthnSupported(){if(!window.PublicKeyCredential||!navigator.credentials)return false; try{return !!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch{return false;}}

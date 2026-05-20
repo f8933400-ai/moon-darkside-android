@@ -127,13 +127,13 @@ P5-03 验收确认：成员头像、房间背景和聊天图片都会在完整 J
 
 1. 先读取和解析 JSON。
 2. 迁移旧数据结构并补齐字段。
-3. 对 `messages` 中的 `imageData` 写入 IndexedDB，设置 `imageId`，删除 `imageData`。
-4. 对 `members` 中的 `avatarData` 写入 IndexedDB，设置 `avatarId`，删除 `avatarData`。
-5. 对 `rooms` 中的 `backgroundData` 写入 IndexedDB，设置 `backgroundId`，删除 `backgroundData`。
+3. 对 `messages` 中的 `imageData` 写入 IndexedDB，设置新的唯一 import `imageId`，删除 `imageData`。
+4. 对 `members` 中的 `avatarData` 写入 IndexedDB，设置新的唯一 import `avatarId`，删除 `avatarData`。
+5. 对 `rooms` 中的 `backgroundData` 写入 IndexedDB，设置新的唯一 import `backgroundId`，删除 `backgroundData`。
 6. 对原本校验正常的消息按现有规则重算 `integrity`；对原备份中已经校验异常的消息，保留异常状态并提示用户。
 7. 全部成功后才覆盖当前运行时 data 并保存。
 
-如果导入失败，当前 data 不会被覆盖。
+如果导入失败，当前 data 不会被覆盖；本次导入已经写入的图片会 best-effort 删除，避免覆盖或污染本机已有图片库。
 
 如果导入确认时提示存在 `messageIntegrity` 异常，导入完成后这些异常消息仍会保持“校验异常”状态，不会因为图片 externalize 被静默重算成正常。
 

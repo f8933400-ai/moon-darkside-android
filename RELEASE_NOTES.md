@@ -1,5 +1,17 @@
 # 发布说明
 
+## P6-00 封包前关键数据安全修复
+
+P6-00 暂停 Android APK / macOS DMG / iOS 自签测试包试制，优先修复封包前 P1 数据安全问题：
+
+- 导入主 JSON / encrypted-json 时，图片 externalize 改用唯一 import 图片 ID，避免覆盖本机已有同名 IndexedDB 图片。
+- 导入或图片迁移失败时，会 best-effort 清理本轮已经写入 IndexedDB 的图片，并恢复内存数据状态。
+- 删除成员 / 群组 / 消息时增加 rollback；保存成功后才清理对应头像、背景或消息图片。
+- 删除成员时清理任务、投票、fronting 和私聊中的非历史悬挂引用；不删除历史消息。
+- fronting 新增 / 删除 / 结束和清空数据路径增加 `save()` 失败回滚，避免 UI 与 localStorage 状态错位。
+
+本轮未处理锁屏密码强度、仅生物识别不设密码、`messageIntegrity` 分隔符、Service Worker 缓存策略、`dataUrlToBlob` charset、urlCache、账本金额浮点、QR 库 eval 风格和封面模式计时器等中低风险项；这些进入 P6-01 或后续阶段。
+
 ## v0.4.0-local-stable
 
 这是《月之暗面》的 v0.4.0 本地稳定版。重点是把 P4 本地账本隔离和 P5 数据安全、图片备份恢复、PWA 离线缓存验收收束为可分发的 local stable 包。

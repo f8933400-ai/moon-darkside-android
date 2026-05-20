@@ -133,9 +133,16 @@
         }
       });
     }
+    function renderFrontingAfterRollback(){
+      renderFrontingCurrent();
+      renderFrontingList();
+      renderFrontingStatus();
+      if(typeof render==="function")render();
+    }
     async function saveFrontingLogFromForm(){
       const payload=collectFrontingForm();
       if(!payload)return;
+      const snapshot=cloneAppStateForRollback();
       data.frontingLogs=Array.isArray(data.frontingLogs)?data.frontingLogs:[];
       const editId=document.getElementById("frontingEditId")?.value||"";
       const stamp=now();
@@ -159,7 +166,9 @@
         if(!(await save()))throw new Error("save returned false");
       }catch(err){
         console.error("fronting save failed",err);
-        alert(`${term("fronting")}记录保存失败，请重试。`);
+        restoreAppStateFromRollback(snapshot);
+        renderFrontingAfterRollback();
+        alert("保存失败，已恢复原状态。");
         return;
       }
       resetFrontingForm();
@@ -176,12 +185,15 @@
       const log=(data.frontingLogs||[]).find(f=>f.id===id);
       if(!log)return;
       if(!confirm(`确定删除这条${term("fronting")}记录吗？此操作不可恢复。`))return;
+      const snapshot=cloneAppStateForRollback();
       data.frontingLogs=(data.frontingLogs||[]).filter(f=>f.id!==id);
       try{
         if(!(await save()))throw new Error("save returned false");
       }catch(err){
         console.error("fronting delete failed",err);
-        alert(`${term("fronting")}记录删除失败，请重试。`);
+        restoreAppStateFromRollback(snapshot);
+        renderFrontingAfterRollback();
+        alert("保存失败，已恢复原状态。");
         return;
       }
       resetFrontingForm();
@@ -192,6 +204,7 @@
     async function endFronting(){
       const current=getCurrentFrontingLog();
       if(!current)return;
+      const snapshot=cloneAppStateForRollback();
       const stamp=now();
       current.endAt=stamp;
       current.updatedAt=stamp;
@@ -199,7 +212,9 @@
         if(!(await save()))throw new Error("save returned false");
       }catch(err){
         console.error("fronting end failed",err);
-        alert(`${term("fronting")}记录保存失败，请重试。`);
+        restoreAppStateFromRollback(snapshot);
+        renderFrontingAfterRollback();
+        alert("保存失败，已恢复原状态。");
         return;
       }
       resetFrontingForm();
