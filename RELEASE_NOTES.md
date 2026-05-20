@@ -1,5 +1,30 @@
 # 发布说明
 
+## v0.4.0-local-stable
+
+这是《月之暗面》的 v0.4.0 本地稳定版。重点是把 P4 本地账本隔离和 P5 数据安全、图片备份恢复、PWA 离线缓存验收收束为可分发的 local stable 包。
+
+本版本仍然是 local-only / offline-first：没有云同步、账号、遥测、CDN、npm、构建步骤、`type="module"` 或远程 API。
+
+主要内容：
+
+- 完成 P4 账本能力：本地账本 CRUD、日 / 月 / 年 / 全部统计、分类管理、月度预算、分类预算、CSS 条形图、账本 JSON v2 和 CSV 专用导出。
+- 完成账本隔离：主记录 JSON / encrypted-json 不包含 `ledgerRecords` 或 `ledgerSettings`；账本 records 使用 `moonLedger.records.v1`，账本 settings 使用 `moonLedger.settings.v1`。
+- encrypted-json 固定导出完整主记录范围，不再跟随当前群组 / 指定群组导出范围；账本仍需单独备份。
+- 导入主 JSON 时，如果原备份存在 `messageIntegrity` 异常，异常消息不会被图片 externalize 流程静默洗成“校验正常”。
+- 完成图片备份 / 恢复验收：成员头像、房间背景、聊天图片可通过完整 JSON / encrypted-json hydrate 和 externalize 恢复。
+- 完成图片一致性最小修复：新增图片写入后如果主数据保存失败，会尽量回滚新图片和内存状态；旧头像 / 背景延后到保存成功后清理。
+- 完成 PWA 离线缓存验收：Service Worker 只缓存静态 app shell，缓存名为 `moon-app-shell-v0.4.0`，不缓存用户数据、导出备份、图片 Blob、IndexedDB 或 localStorage。
+- stable zip 通过封版检查，不包含 `.git`、`node_modules`、临时文件、`.DS_Store`、真实备份或敏感样本。
+
+已知风险：
+
+- localStorage 与 IndexedDB 不是浏览器级事务；本版本已做最小回滚和 best-effort 清理，但极端浏览器存储失败仍需用户保留备份。
+- 普通 JSON current / room 主要用于局部恢复或排查，不是严格脱敏分享文件，也不能替代完整备份。
+- `file://` 下不能注册 Service Worker，这是浏览器限制；需要 PWA 离线壳缓存时请使用 localhost 或 HTTPS。
+- PWA 不是备份替代品。更换浏览器、清理站点数据、重装系统或换设备前仍需导出完整 JSON / encrypted-json 和账本备份。
+- 不同浏览器的 PWA 安装提示条件可能不同。
+
 ## v0.3.0-local-stable
 
 这是《月之暗面》的 P0-P2 本地稳定版。重点是把多意识体本地记录、前台日志、交接任务、隐私导出、照护、时间线和复盘报告打磨到可长期自用的基础状态。

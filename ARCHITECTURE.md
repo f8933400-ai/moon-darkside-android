@@ -6,7 +6,7 @@
 
 页面入口是 `index.html`。应用可以通过 `file://` 直接打开，也可以通过本地 HTTP 服务打开，例如 `http://127.0.0.1:8080/index.html`。
 
-项目不使用 `type="module"`，不引入 CDN、npm、构建步骤、账号、云同步、遥测或远程 API。所有 JavaScript 都通过普通 `<script src="...">` 顺序加载，共享同一个全局作用域。用户数据默认保存在本机 `localStorage` + IndexedDB 中，不会由应用主动上传到外部服务。
+当前稳定边界为 `v0.4.0-local-stable`。项目不使用 `type="module"`，不引入 CDN、npm、构建步骤、账号、云同步、遥测或远程 API。所有 JavaScript 都通过普通 `<script src="...">` 顺序加载，共享同一个全局作用域。用户数据默认保存在本机 `localStorage` + IndexedDB 中，不会由应用主动上传到外部服务。
 
 ## 2. 文件结构与加载顺序
 
@@ -65,7 +65,7 @@ PWA 支持由 `js/sw-register.js`、`sw.js` 和 `manifest.webmanifest` 组成。
 
 - `js/sw-register.js` 只在 `https:` 或本机 `http://localhost` / `127.0.0.1` / `[::1]` 下注册 Service Worker。
 - `file://` 下会跳过 Service Worker。页面仍可直接打开，但没有 PWA 离线壳缓存。
-- `sw.js` 的缓存名为 `moon-app-shell-p5-04-v0.4.0`。
+- `sw.js` 的缓存名为 `moon-app-shell-v0.4.0`。
 - `APP_SHELL` 只包含静态应用壳：入口 HTML、样式、manifest、favicon、本地图标和 `index.html` 直接加载的普通 `js/` 脚本。
 - fetch handler 只响应同源 `GET` 且 pathname 命中 `APP_SHELL_PATHS` 的 http / https 请求。
 - Service Worker 不缓存用户导出的 `.json`、`.moonenc.json`、账本 JSON、CSV、图片 Blob、IndexedDB 内容或 localStorage 内容。

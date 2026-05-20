@@ -2,6 +2,8 @@
 
 《月之暗面》是一个本地离线单页应用，用于多意识体场景下的日常记录、内部沟通、前台日志、交接、任务、议题、照护、时间线回顾和复盘整理。它也带有一个本地账本首页，可作为普通离线账本独立使用。
 
+当前稳定版：`v0.4.0-local-stable`。
+
 本应用只做记录和整理，不提供诊断、治疗建议、医疗建议或危机干预。
 
 ## Local-only / Offline-first
@@ -33,7 +35,7 @@ http://127.0.0.1:8080/index.html
 
 在本机 `localhost` / `127.0.0.1` HTTP，或可信的 HTTPS 本地 / 私有静态服务下打开时，浏览器可以把《月之暗面》作为 PWA 安装到桌面或主屏幕。PWA 安装只是更方便地打开应用，不会启用云同步、账号、遥测或远程 API。
 
-Service Worker 只缓存静态应用文件，例如 `index.html`、`styles.css`、`manifest.webmanifest`、本地图标和 `js/` 脚本。P5-04 已将静态壳缓存版本更新为 `moon-app-shell-p5-04-v0.4.0`，并补齐 192 / 512 本地图标。用户数据仍保存在当前浏览器的 `localStorage` 和 IndexedDB 中；导出的 `.json` / `.moonenc.json` 备份、账本 JSON / CSV、图片 Blob、IndexedDB 内容和本机存储内容不会被 Service Worker 打包或上传。
+Service Worker 只缓存静态应用文件，例如 `index.html`、`styles.css`、`manifest.webmanifest`、本地图标和 `js/` 脚本。v0.4.0 local stable 的静态壳缓存版本是 `moon-app-shell-v0.4.0`，并包含 128 / 192 / 512 本地图标。用户数据仍保存在当前浏览器的 `localStorage` 和 IndexedDB 中；导出的 `.json` / `.moonenc.json` 备份、账本 JSON / CSV、图片 Blob、IndexedDB 内容和本机存储内容不会被 Service Worker 打包或上传。
 
 PWA 不替代完整 JSON 备份或加密备份。更新 app 文件后，Service Worker 会尝试安装新的静态壳缓存并清理旧的 `moon-app-shell-*` 缓存；如果浏览器仍显示旧界面，可以刷新页面，或在浏览器里清理此站点的缓存 / Service Worker 后再打开。
 
