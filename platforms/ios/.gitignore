@@ -1,0 +1,15 @@
+# iOS / Xcode package-test wrapper outputs
+build/
+DerivedData/
+MoonDarksideIOS/Resources/www/
+*.ipa
+*.app
+*.xcarchive
+*.mobileprovision
+*.p12
+**/*.xcuserdata
+**/*.xcuserstate
+**/*.ipa
+**/*.app
+**/*.xcarchive
+.DS_Store

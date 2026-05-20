@@ -37,3 +37,15 @@ platforms/macos/**/*.dmg
 platforms/macos/**/*.xcarchive
 platforms/macos/**/*.xcuserdata
 platforms/macos/**/*.xcuserstate
+
+# iOS package-test wrapper outputs
+platforms/ios/build/
+platforms/ios/DerivedData/
+platforms/ios/MoonDarksideIOS/Resources/www/
+platforms/ios/**/*.xcuserdata/
+platforms/ios/**/*.xcuserstate
+platforms/ios/**/*.ipa
+platforms/ios/**/*.app
+platforms/ios/**/*.xcarchive
+platforms/ios/*.mobileprovision
+platforms/ios/*.p12

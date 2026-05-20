@@ -1,5 +1,18 @@
 # 发布说明
 
+## P6-06 iOS WKWebView 自签测试壳 / IPA 试制
+
+P6-06 新增 iOS WKWebView 自签测试壳工程：
+
+- 新增 `platforms/ios/` Swift + UIKit + WebKit 工程，使用 `WKWebView` 加载 app bundle 内的本地静态 app shell。
+- 构建脚本在构建前同步当前 Web app 静态资源到 iOS app 的 `Resources/www/` 生成目录，不提交重复 Web app 副本，并排除 `.git`、`node_modules`、真实备份、包产物和临时文件。
+- `WKWebView` 使用 `loadFileURL(..., allowingReadAccessTo:)` 加载本地 app shell，外部导航默认拦截；wrapper 不依赖 Service Worker。
+- 已通过 simulator app 构建验证，构建产物保留在 ignored build 目录，不提交 `.app`、archive 或 IPA。
+- 当前环境没有 signing identity / Team ID / 连接设备，也没有可用 iOS simulator device，因此未进行设备安装、运行态验收、archive 或 IPA export。
+- 本轮没有修改 Web app 核心业务语义，没有改变主记录、encrypted-json、账本、图片、锁屏或 integrity 规则。
+
+本轮 iOS 产物定位为自签 / 本人设备测试壳，不是正式分发包。没有 Apple Developer Program 时，不能做 App Store、TestFlight 或正式 Ad Hoc 分发；后续需要在 Xcode 中选择 Personal Team 并连接设备后继续试制 IPA 或安装测试。下一阶段进入三端综合验收。
+
 ## P6-05 macOS WKWebView DMG 测试包
 
 P6-05 新增 macOS WKWebView DMG 测试壳，并生成本地测试 `.app` / DMG：
