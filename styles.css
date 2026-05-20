@@ -169,6 +169,11 @@
     .export-redaction-box .inline-check { margin:0; }
     .review-export-options { display:none; gap:12px; margin-top:12px; padding:12px; border:1px solid #dbeafe; border-radius:10px; background:#eff6ff; }
     .review-export-options.active { display:grid; }
+    .encrypted-backup-options, .encrypted-import-box { display:grid; gap:10px; margin-top:12px; padding:12px; border:1px solid #c7d2fe; border-radius:10px; background:#eef2ff; }
+    .encrypted-backup-options[hidden], .encrypted-import-box[hidden] { display:none; }
+    .encrypted-backup-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .encrypted-backup-grid label, .encrypted-import-box label { min-width:0; margin:0; }
+    .encrypted-backup-grid input, .encrypted-import-box input { margin-top:5px; }
     .review-export-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
     .review-export-grid.compact { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
     .review-export-grid label { min-width:0; margin:0; }
@@ -465,6 +470,7 @@
     body.dark .visibility-note, body.dark .privacy-warning, body.dark .system-card-privacy-note { background:#172554; border-color:#1d4ed8; color:#bfdbfe; }
     body.dark .export-redaction-box { background:#111827; border-color:#4b5563; }
     body.dark .review-export-options { background:#172554; border-color:#1d4ed8; color:#bfdbfe; }
+    body.dark .encrypted-backup-options, body.dark .encrypted-import-box { background:#111827; border-color:#4f46e5; color:#c7d2fe; }
     body.dark .review-export-section h3 { color:#bfdbfe; }
     body.dark .review-export-section .inline-check, body.dark .review-export-note { background:#111827; border-color:#4b5563; color:#bfdbfe; }
     body.dark .privacy-warning { background:#451a03; border-color:#92400e; color:#fde68a; }
@@ -663,7 +669,8 @@
       .visibility-control { align-items:stretch; }
       .export-redaction-box { padding:9px; }
       .review-export-options { padding:10px; }
-      .review-export-grid, .review-export-grid.compact { grid-template-columns:1fr; }
+      .encrypted-backup-options, .encrypted-import-box { padding:10px; }
+      .encrypted-backup-grid, .review-export-grid, .review-export-grid.compact { grid-template-columns:1fr; }
       .annotate-toolbar { grid-template-columns:repeat(3,1fr) 48px; }
       .annotate-toolbar input[type="text"], .annotate-size { grid-column:1 / -1; }
       .annotate-toolbar button { padding:8px 6px; }

@@ -248,10 +248,11 @@
     document.getElementById("exportBtn").onclick=()=>{closeModal("settingsModal"); openExportModal();};
     document.getElementById("exportScope").onchange=updateExportRoomPicker;
     document.getElementById("exportRedacted").onchange=e=>{if(e.target.checked){document.getElementById("exportExcludePrivate").checked=true;} updateRedactionControls();};
-    document.getElementById("exportFormat").onchange=()=>{updateRedactionControls(); if(typeof window.updateReviewExportOptionsVisibility==="function")window.updateReviewExportOptionsVisibility();};
+    document.getElementById("exportFormat").onchange=()=>{updateRedactionControls(); if(typeof window.updateReviewExportOptionsVisibility==="function")window.updateReviewExportOptionsVisibility(); if(typeof updateEncryptedBackupOptionsVisibility==="function")updateEncryptedBackupOptionsVisibility();};
     document.getElementById("confirmExportBtn").onclick=()=>downloadExport().catch(err=>{console.error("导出失败",err); alert("导出失败："+(err.message||err));});
-    document.getElementById("importBtn").onclick=()=>importInput.click();
+    document.getElementById("importBtn").onclick=()=>handleImportButtonClick();
     importInput.onchange=()=>{const file=importInput.files?.[0]; importInput.value=""; importBackupFile(file);};
+    document.getElementById("importEncryptedBackupPassword").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault(); handleImportButtonClick();}});
     document.getElementById("lockSettingsBtn").onclick=()=>{closeModal("settingsModal"); document.getElementById("newLockPassword").value=""; document.getElementById("useBiometric").checked=!!prefs.useBiometric; openModal("lockSettingsModal");};
     document.getElementById("saveLockBtn").onclick=saveLockSettings;
     document.getElementById("disableLockBtn").onclick=disableLock;

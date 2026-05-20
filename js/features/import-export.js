@@ -17,7 +17,7 @@
     function redactedMdMessageBody(message,options){const text=redactTextForExport(message.text||"",options).replace(/\n/g,"\n  "); const image=(message.imageData||message.imageId)?"[含图片]":""; return [text,image].filter(Boolean).join(text&&image?"\n\n  ":"");}
     function redactedSystemProfileLines(options){const profile=redactSystemProfileForExport(data.systemProfile, data.systemProfileVisibility, "public"); return Object.entries(profile).map(([key,value])=>({label:SYSTEM_PROFILE_EXPORT_LABELS[key]||key,value:redactTextForExport(value,options)}));}
     function redactedSystemProfileBlock(format,options){const lines=redactedSystemProfileLines(options); if(!lines.length)return ""; if(format==="md")return ["## 系统公开资料",...lines.map(row=>`- **${row.label}**：${row.value}`),"","可见性只影响本应用内展示和导出，不是加密隔离。"].join("\n"); return ["【系统公开资料】",...lines.map(row=>`${row.label}：${row.value}`),"可见性只影响本应用内展示和导出，不是加密隔离。"].join("\n");}
-    function openExportModal(){document.getElementById("exportRoom").innerHTML=data.rooms.map(r=>`<option value="${r.id}">${esc(roomDisplayName(r))}</option>`).join(""); document.getElementById("exportRoom").value=currentRoomId; document.getElementById("exportScope").value="current"; const redacted=document.getElementById("exportRedacted"), exclude=document.getElementById("exportExcludePrivate"), hide=document.getElementById("exportHideMemberNames"); if(redacted)redacted.checked=false; if(exclude)exclude.checked=true; if(hide)hide.checked=false; resetReviewExportControls(); updateRedactionControls(); updateExportRoomPicker(); updateReviewExportOptionsVisibility(); openModal("exportModal");}
+    function openExportModal(){document.getElementById("exportRoom").innerHTML=data.rooms.map(r=>`<option value="${r.id}">${esc(roomDisplayName(r))}</option>`).join(""); document.getElementById("exportRoom").value=currentRoomId; document.getElementById("exportScope").value="current"; const redacted=document.getElementById("exportRedacted"), exclude=document.getElementById("exportExcludePrivate"), hide=document.getElementById("exportHideMemberNames"); if(redacted)redacted.checked=false; if(exclude)exclude.checked=true; if(hide)hide.checked=false; resetReviewExportControls(); resetEncryptedImportControls(); updateRedactionControls(); updateExportRoomPicker(); updateReviewExportOptionsVisibility(); updateEncryptedBackupOptionsVisibility(); openModal("exportModal");}
     function updateExportRoomPicker(){const isRoom=document.getElementById("exportScope").value==="room"; document.getElementById("exportRoom").style.display=isRoom?"block":"none"; document.getElementById("exportRoomLabel").style.display=isRoom?"block":"none";}
     function selectedExportRooms(){const scope=document.getElementById("exportScope").value; if(scope==="all")return data.rooms; if(scope==="room")return data.rooms.filter(r=>r.id===document.getElementById("exportRoom").value); return data.rooms.filter(r=>r.id===currentRoomId);}
     function selectedExportData(){const rooms=selectedExportRooms(); const ids=new Set(rooms.map(r=>r.id)); const messages=data.messages.filter(m=>ids.has(m.roomId)); return {rooms,messages};}
@@ -46,6 +46,7 @@
       return {text:[profileBlock,blocks.join("\n\n---\n\n")].filter(Boolean).join("\n\n---\n\n"),type:"text/plain;charset=utf-8",ext:format};
     }
     const REVIEW_EXPORT_FORMATS=new Set(["review-md","review-txt"]);
+    let pendingEncryptedBackupEnvelope=null;
     const REVIEW_TIMELINE_LIMIT=100;
     const REVIEW_ROOM_MESSAGE_LIMIT=10;
     const REVIEW_TEXT_LIMIT=160;
@@ -81,6 +82,58 @@
       const active=isReviewExportFormat(format);
       if(active)setReviewExportDefaultDates(false);
       box.classList.toggle("active",active);
+    }
+    function updateEncryptedBackupOptionsVisibility(){
+      const active=document.getElementById("exportFormat")?.value==="encrypted-json";
+      const box=document.getElementById("encryptedBackupOptions");
+      if(box)box.hidden=!active;
+      if(!active)clearEncryptedBackupPasswordFields();
+    }
+    function clearEncryptedBackupPasswordFields(){
+      const pass=document.getElementById("encryptedBackupPassword");
+      const confirm=document.getElementById("encryptedBackupPasswordConfirm");
+      if(pass)pass.value="";
+      if(confirm)confirm.value="";
+    }
+    function resetEncryptedImportControls(){
+      pendingEncryptedBackupEnvelope=null;
+      const box=document.getElementById("encryptedImportBox");
+      const input=document.getElementById("importEncryptedBackupPassword");
+      const btn=document.getElementById("importBtn");
+      if(box)box.hidden=true;
+      if(input)input.value="";
+      if(btn)btn.textContent="导入 JSON";
+    }
+    function showEncryptedImportControls(envelope){
+      pendingEncryptedBackupEnvelope=envelope;
+      const box=document.getElementById("encryptedImportBox");
+      const input=document.getElementById("importEncryptedBackupPassword");
+      const btn=document.getElementById("importBtn");
+      if(box)box.hidden=false;
+      if(input){input.value=""; setTimeout(()=>input.focus(),0);}
+      if(btn)btn.textContent="解密并导入";
+    }
+    function getEncryptedBackupPasswordFields(){
+      const password=normalizeEncryptedBackupPassword(document.getElementById("encryptedBackupPassword")?.value||"");
+      const confirm=normalizeEncryptedBackupPassword(document.getElementById("encryptedBackupPasswordConfirm")?.value||"");
+      return {password,confirm};
+    }
+    function validateEncryptedBackupPasswords(password,confirm){
+      if(!password){alert("请填写备份密码。"); return false;}
+      if(password.length<8){alert("备份密码至少需要 8 个字符。建议使用更长的密码。"); return false;}
+      if(password!==confirm){alert("两次输入的备份密码不一致。"); return false;}
+      return true;
+    }
+    function encryptedBackupFilename(date=new Date()){
+      const pad=n=>String(n).padStart(2,"0");
+      return `moon-backup-encrypted-${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}.moonenc.json`;
+    }
+    function encryptedBackupErrorMessage(err){
+      if(err?.message==="web_crypto_unavailable")return "当前浏览器不支持本地加密所需的 Web Crypto API。";
+      if(err?.message==="decrypt_failed")return "解密失败：密码不正确，或备份文件已损坏。当前数据没有被修改。";
+      if(err?.message==="invalid_encrypted_backup")return "这不是有效的月之暗面加密备份。";
+      if(err?.message==="invalid_backup")return "解密成功，但内容不是有效的月之暗面 JSON 备份。当前数据没有被修改。";
+      return err?.message||err||"未知错误";
     }
     function collectReviewExportOptions(){
       const base=getRedactionOptions();
@@ -340,6 +393,150 @@
     }
     async function hydrateImagesForJsonExport(exportObj){let anyMissing=false; for(const m of exportObj.messages||[]){if(m.imageId&&!m.imageData){try{const blob=await window.imageStore.getImageBlob(m.imageId); if(blob){m.imageData=await window.imageStore.blobToDataUrl(blob);}else{console.warn("hydrateImagesForJsonExport: missing blob for imageId",m.imageId); anyMissing=true;}}catch(err){console.warn("hydrateImagesForJsonExport: failed to hydrate imageId",m.imageId,err); anyMissing=true;}}} for(const mb of exportObj.members||[]){if(mb.avatarId&&!mb.avatarData){try{const blob=await window.imageStore.getImageBlob(mb.avatarId); if(blob){mb.avatarData=await window.imageStore.blobToDataUrl(blob);}else{console.warn("hydrateImagesForJsonExport: missing blob for avatarId",mb.avatarId); anyMissing=true;}}catch(err){console.warn("hydrateImagesForJsonExport: failed to hydrate avatarId",mb.avatarId,err); anyMissing=true;}}} for(const r of exportObj.rooms||[]){if(r.backgroundId&&!r.backgroundData){try{const blob=await window.imageStore.getImageBlob(r.backgroundId); if(blob){r.backgroundData=await window.imageStore.blobToDataUrl(blob);}else{console.warn("hydrateImagesForJsonExport: missing blob for backgroundId",r.backgroundId); anyMissing=true;}}catch(err){console.warn("hydrateImagesForJsonExport: failed to hydrate backgroundId",r.backgroundId,err); anyMissing=true;}}} return anyMissing;}
     async function formatExportJsonAsync(){const selected=selectedExportData(); const selectedRoomIds=new Set(selected.rooms.map(r=>r.id)); const includeLedger=document.getElementById("exportScope").value==="all"; const exportObj=JSON.parse(JSON.stringify({app:"月之暗面",version:2,exportedAt:now(),nextSeq:data.nextSeq,tags:data.tags||[],messageKinds:data.messageKinds||DEFAULT_KINDS,polls:(data.polls||[]).filter(p=>selectedRoomIds.has(p.roomId)),handoffNotes:(data.handoffNotes||[]).filter(n=>selectedRoomIds.has(n.roomId)),frontingLogs:data.frontingLogs||[],...(includeLedger?{tasks:data.tasks||[],careLogs:data.careLogs||[],careChecklist:data.careChecklist||[],ledgerRecords:normalizeLedgerRecordsForBackup(getRuntimeLedgerRecordsForBackup())}:{}),systemProfile:data.systemProfile||blankSystemProfile(),systemProfileVisibility:normalizeSystemProfileVisibilityRecord(data.systemProfileVisibility),memberRelations:data.memberRelations||[],externalSystemCards:data.externalSystemCards||[],rooms:selected.rooms,members:data.members,messages:selected.messages})); const anyMissing=await hydrateImagesForJsonExport(exportObj); if(anyMissing)alert("警告：部分图片在 IndexedDB 中找不到，备份可能不完整。\n\n建议先运行 window.runImageMigrationToIndexedDB() 迁移旧图片后再导出。"); return {text:JSON.stringify(exportObj,null,2),type:"application/json",ext:"json"};}
-    async function downloadExport(){const format=document.getElementById("exportFormat").value; if(isReviewExportFormat(format)){const result=generateReviewExport(format); if(!result)return; if(!result.text.trim()){alert("没有可导出的内容。"); return;} if(window.MoonBridge?.saveFile){window.MoonBridge.saveFile(result.filename,result.type,result.text); closeModal("exportModal"); return;} const blob=new Blob([result.text],{type:result.type}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=result.filename; a.click(); URL.revokeObjectURL(url); closeModal("exportModal"); return;} const scope=document.getElementById("exportScope").value; const rooms=selectedExportRooms(); const options=getRedactionOptions(); if(format==="json"&&options.redacted)alert("JSON 用于完整备份，默认保留全量数据；脱敏导出请使用 Markdown / TXT / CSV。本次 JSON 会按完整备份导出。"); if(format!=="json"&&options.redacted&&options.excludePrivate&&rooms.length&&!rooms.some(r=>!isPrivateRoom(r))){alert("当前导出范围只包含私聊 / 小群聊，且已选择排除私聊，因此没有可导出的内容。可以取消“排除私聊”，或改选其它范围。"); return;} const hasPrivate=rooms.some(isPrivateRoom); if(format!=="json"&&hasPrivate&&!(options.redacted&&options.excludePrivate)){const isCurrentPrivate=scope==="current"&&rooms.length===1&&isPrivateRoom(rooms[0]); const msg=isCurrentPrivate?"当前群组是私聊 / 小群聊，是否继续导出？":"当前导出范围包含私聊 / 小群聊，是否继续？"; if(!confirm(msg))return;} let result; if(format==="json"){const btn=document.getElementById("confirmExportBtn"); btn.disabled=true; try{result=await formatExportJsonAsync();}catch(err){console.error("downloadExport: JSON export failed",err); alert("导出失败："+(err.message||err)); btn.disabled=false; return;} btn.disabled=false;} else {result=formatExport(format);} if(!result.text.trim()){alert("没有可导出的内容。"); return;} const label=scope==="all"?"全部对话":(roomDisplayName(rooms[0])||"对话"); const filename=`月之暗面-${fileSafe(options.redacted?`${label}-脱敏`:label)}-${new Date().toISOString().slice(0,10)}.${result.ext}`; if(window.MoonBridge?.saveFile){window.MoonBridge.saveFile(filename,result.type,result.text); closeModal("exportModal"); return;} const blob=new Blob([result.text],{type:result.type}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); closeModal("exportModal");}
+    async function downloadExport(){
+      const format=document.getElementById("exportFormat").value;
+      if(isReviewExportFormat(format)){
+        const result=generateReviewExport(format);
+        if(!result)return;
+        if(!result.text.trim()){alert("没有可导出的内容。"); return;}
+        if(window.MoonBridge?.saveFile){window.MoonBridge.saveFile(result.filename,result.type,result.text); closeModal("exportModal"); return;}
+        const blob=new Blob([result.text],{type:result.type});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement("a");
+        a.href=url;
+        a.download=result.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        closeModal("exportModal");
+        return;
+      }
+      const scope=document.getElementById("exportScope").value;
+      const rooms=selectedExportRooms();
+      const options=getRedactionOptions();
+      const isJsonBackup=format==="json"||format==="encrypted-json";
+      if(isJsonBackup&&options.redacted)alert("JSON 用于完整备份，默认保留全量数据；脱敏导出请使用 Markdown / TXT / CSV。本次 JSON 会按完整备份导出。");
+      if(!isJsonBackup&&options.redacted&&options.excludePrivate&&rooms.length&&!rooms.some(r=>!isPrivateRoom(r))){alert("当前导出范围只包含私聊 / 小群聊，且已选择排除私聊，因此没有可导出的内容。可以取消“排除私聊”，或改选其它范围。"); return;}
+      const hasPrivate=rooms.some(isPrivateRoom);
+      if(!isJsonBackup&&hasPrivate&&!(options.redacted&&options.excludePrivate)){
+        const isCurrentPrivate=scope==="current"&&rooms.length===1&&isPrivateRoom(rooms[0]);
+        const msg=isCurrentPrivate?"当前群组是私聊 / 小群聊，是否继续导出？":"当前导出范围包含私聊 / 小群聊，是否继续？";
+        if(!confirm(msg))return;
+      }
+      let result;
+      let filename="";
+      if(isJsonBackup){
+        if(format==="encrypted-json"){
+          const fields=getEncryptedBackupPasswordFields();
+          if(!validateEncryptedBackupPasswords(fields.password,fields.confirm))return;
+        }
+        const btn=document.getElementById("confirmExportBtn");
+        btn.disabled=true;
+        try{
+          const jsonResult=await formatExportJsonAsync();
+          if(format==="encrypted-json"){
+            const fields=getEncryptedBackupPasswordFields();
+            const envelope=await exportEncryptedBackup(JSON.parse(jsonResult.text),fields.password);
+            result={text:JSON.stringify(envelope,null,2),type:"application/json",ext:"moonenc.json"};
+            filename=encryptedBackupFilename();
+          }else{
+            result=jsonResult;
+          }
+        }catch(err){
+          console.error("downloadExport: JSON export failed",err);
+          alert("导出失败："+encryptedBackupErrorMessage(err));
+          return;
+        }finally{
+          btn.disabled=false;
+        }
+      }else{
+        result=formatExport(format);
+      }
+      if(!result.text.trim()){alert("没有可导出的内容。"); return;}
+      if(!filename){
+        const label=scope==="all"?"全部对话":(roomDisplayName(rooms[0])||"对话");
+        filename=`月之暗面-${fileSafe(options.redacted?`${label}-脱敏`:label)}-${new Date().toISOString().slice(0,10)}.${result.ext}`;
+      }
+      if(window.MoonBridge?.saveFile){window.MoonBridge.saveFile(filename,result.type,result.text); closeModal("exportModal"); clearEncryptedBackupPasswordFields(); updateEncryptedBackupOptionsVisibility(); return;}
+      const blob=new Blob([result.text],{type:result.type});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;
+      a.download=filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      closeModal("exportModal");
+      clearEncryptedBackupPasswordFields();
+      updateEncryptedBackupOptionsVisibility();
+    }
     async function externalizeImagesAfterJsonImport(appData){for(const m of appData.messages||[]){if(m.imageData){const imageId=m.imageId||`msgimg-${m.id}`; const blob=window.imageStore.dataUrlToBlob(m.imageData); const mime=m.imageType||blob.type||"image/*"; await window.imageStore.putImage({id:imageId,blob,mime,name:m.imageName||"图片"}); m.imageId=imageId; delete m.imageData;}else if(m.imageId){const blob=await window.imageStore.getImageBlob(m.imageId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: imageId not found in IndexedDB",m.imageId);}} for(const mb of appData.members||[]){if(mb.avatarData){const avatarId=mb.avatarId||`avatar-${mb.id}`; const blob=window.imageStore.dataUrlToBlob(mb.avatarData); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:avatarId,blob,mime,name:`${mb.name||"member"}-头像`}); mb.avatarId=avatarId; delete mb.avatarData;}else if(mb.avatarId){const blob=await window.imageStore.getImageBlob(mb.avatarId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: avatarId not found in IndexedDB",mb.avatarId);}} for(const r of appData.rooms||[]){if(r.backgroundData){const backgroundId=r.backgroundId||`roombg-${r.id}`; const blob=window.imageStore.dataUrlToBlob(r.backgroundData); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:backgroundId,blob,mime,name:`${r.name||r.id||"room"}-背景`}); r.backgroundId=backgroundId; delete r.backgroundData;}else if(r.backgroundId){const blob=await window.imageStore.getImageBlob(r.backgroundId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: backgroundId not found in IndexedDB",r.backgroundId);}} /* JSON 导入把 DataURL 外置到 IndexedDB：imageData(_imgVer:1) → imageId(_imgVer:2)，按现有规则重算 integrity */ for(const m of appData.messages||[])m.integrity=messageIntegrity(m);}
-    function importBackupFile(file){if(!file)return; const reader=new FileReader(); reader.onload=async()=>{try{const parsed=JSON.parse(String(reader.result||"")); const incoming=await storage.importBackup(parsed); const ledgerFromBackup=Array.isArray(parsed.ledgerRecords)?normalizeLedgerRecordsForBackup(parsed.ledgerRecords):null; const bad=incoming.messages.filter(m=>!integrityOk(m)).length; const note=bad?`\n\n注意：备份中有 ${bad} 条消息校验异常，仍可导入，但建议确认来源。`:""; const ledgerNote=ledgerFromBackup?`\n备份包含 ${ledgerFromBackup.length} 条账本记录，导入后会覆盖当前账本。`:"\n备份不包含账本记录，当前账本将保持不变。"; if(!confirm(`导入会覆盖当前本机数据。\n\n备份包含 ${incoming.rooms.length} 个群组、${incoming.members.length} 个成员、${incoming.messages.length} 条消息。${ledgerNote}${note}\n\n确定导入吗？`))return; await externalizeImagesAfterJsonImport(incoming); const previousData=data, previousRoomId=currentRoomId; data=incoming; currentRoomId=data.rooms[0]?.id||"main"; if(!(await save())){data=previousData; currentRoomId=previousRoomId; render(); return;} let ledgerFailed=false; if(ledgerFromBackup){ledgerRecords=ledgerFromBackup; if(!(await saveLedger(ledgerFromBackup))){ledgerFailed=true; console.error("importBackupFile: ledgerRecords save failed after main data import");}} closeModal("exportModal"); if(typeof renderLedger==="function")renderLedger(); render(); alert(ledgerFailed?"备份已导入，但账本记录保存失败。当前账本可能没有完成覆盖。":"备份已导入。");}catch(err){console.error("importBackupFile failed",err); alert(err?.message==="invalid_backup"?"这不是有效的月之暗面 JSON 备份。":"导入失败：JSON 文件无法读取或图片写入存储失败。");}}; reader.onerror=()=>alert("导入失败：文件读取出错。"); reader.readAsText(file);}
+    async function importParsedBackup(parsed){
+      const incoming=await storage.importBackup(parsed);
+      const ledgerFromBackup=Array.isArray(parsed.ledgerRecords)?normalizeLedgerRecordsForBackup(parsed.ledgerRecords):null;
+      const bad=incoming.messages.filter(m=>!integrityOk(m)).length;
+      const note=bad?`\n\n注意：备份中有 ${bad} 条消息校验异常，仍可导入，但建议确认来源。`:"";
+      const ledgerNote=ledgerFromBackup?`\n备份包含 ${ledgerFromBackup.length} 条账本记录，导入后会覆盖当前账本。`:"\n备份不包含账本记录，当前账本将保持不变。";
+      if(!confirm(`导入会覆盖当前本机数据。\n\n备份包含 ${incoming.rooms.length} 个群组、${incoming.members.length} 个成员、${incoming.messages.length} 条消息。${ledgerNote}${note}\n\n确定导入吗？`))return false;
+      await externalizeImagesAfterJsonImport(incoming);
+      const previousData=data, previousRoomId=currentRoomId;
+      data=incoming;
+      currentRoomId=data.rooms[0]?.id||"main";
+      if(!(await save())){data=previousData; currentRoomId=previousRoomId; render(); return false;}
+      let ledgerFailed=false;
+      if(ledgerFromBackup){
+        ledgerRecords=ledgerFromBackup;
+        if(!(await saveLedger(ledgerFromBackup))){
+          ledgerFailed=true;
+          console.error("importBackupFile: ledgerRecords save failed after main data import");
+        }
+      }
+      closeModal("exportModal");
+      resetEncryptedImportControls();
+      if(typeof renderLedger==="function")renderLedger();
+      render();
+      alert(ledgerFailed?"备份已导入，但账本记录保存失败。当前账本可能没有完成覆盖。":"备份已导入。");
+      return true;
+    }
+    async function importPendingEncryptedBackup(){
+      if(!pendingEncryptedBackupEnvelope)return false;
+      const input=document.getElementById("importEncryptedBackupPassword");
+      const password=normalizeEncryptedBackupPassword(input?.value||"");
+      if(!password){alert("请输入备份密码。"); input?.focus(); return false;}
+      const btn=document.getElementById("importBtn");
+      if(btn)btn.disabled=true;
+      try{
+        const parsed=await decryptBackupEnvelope(pendingEncryptedBackupEnvelope,password);
+        await importParsedBackup(parsed);
+      }catch(err){
+        if(err?.message!=="decrypt_failed")console.error("importPendingEncryptedBackup failed",err);
+        alert(encryptedBackupErrorMessage(err));
+        input?.select();
+      }finally{
+        if(btn)btn.disabled=false;
+      }
+      return true;
+    }
+    function handleImportButtonClick(){
+      if(pendingEncryptedBackupEnvelope){importPendingEncryptedBackup(); return;}
+      resetEncryptedImportControls();
+      document.getElementById("importInput")?.click();
+    }
+    function importBackupFile(file){
+      if(!file)return;
+      resetEncryptedImportControls();
+      const reader=new FileReader();
+      reader.onload=async()=>{
+        try{
+          const parsed=JSON.parse(String(reader.result||""));
+          if(isEncryptedBackupEnvelope(parsed)){
+            showEncryptedImportControls(parsed);
+            return;
+          }
+          await importParsedBackup(parsed);
+        }catch(err){
+          console.error("importBackupFile failed",err);
+          alert(err?.message==="invalid_backup"?"这不是有效的月之暗面 JSON 备份。":"导入失败：JSON 文件无法读取或图片写入存储失败。");
+        }
+      };
+      reader.onerror=()=>alert("导入失败：文件读取出错。");
+      reader.readAsText(file);
+    }
