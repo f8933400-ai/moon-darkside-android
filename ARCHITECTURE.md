@@ -2,68 +2,70 @@
 
 ## 1. 项目概述
 
-“月之暗面”是一个本地运行的单页面应用，用于记录群组、私聊、成员、状态、投票、交接便签、账本和系统资料。页面入口是 `index.html`，可以通过 `file://` 直接打开，也可以用本地 HTTP 服务打开，例如 `http://127.0.0.1:8080/index.html`。
+“月之暗面”是一个 local-only / offline-first 的本地离线单页面应用，用于多意识体场景下的聊天式记录、成员与群组管理、私聊、前台日志、交接、任务、议题 / 投票、照护、时间线回顾、复盘导出、账本伪装首页和系统资料整理。
 
-本项目没有构建步骤，不使用 `type="module"`，没有 CDN，没有 npm 依赖，也没有远程 API 请求。所有 JavaScript 文件通过普通 `<script src="...">` 按顺序加载，共享同一个全局作用域。
+页面入口是 `index.html`。应用可以通过 `file://` 直接打开，也可以通过本地 HTTP 服务打开，例如 `http://127.0.0.1:8080/index.html`。
 
-本项目默认 local-only / offline-first，不需要账号、云端、遥测或远程 API。所有用户数据默认保存在本机浏览器存储中（`localStorage` + IndexedDB）。没有任何数据会被发送到外部服务器。
+项目不使用 `type="module"`，不引入 CDN、npm、构建步骤、账号、云同步、遥测或远程 API。所有 JavaScript 都通过普通 `<script src="...">` 顺序加载，共享同一个全局作用域。用户数据默认保存在本机 `localStorage` + IndexedDB 中，不会由应用主动上传到外部服务。
 
 ## 2. 文件结构与加载顺序
 
-`index.html` 当前脚本加载顺序如下：
+`index.html` 当前脚本加载顺序如下。这里省略 cache-busting query 参数，只保留实际文件路径；依赖关系以这个顺序为准：
 
 ```html
 <script src="js/data.js"></script>
+<script src="js/features/terms.js"></script>
 <script src="js/imageStore.js"></script>
 <script src="js/integrity.js"></script>
 <script src="js/migrate.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/imageMigration.js"></script>
 <script src="js/imageHealth.js"></script>
+<script src="js/features/backup-health-ui.js"></script>
 <script src="js/render.js"></script>
 <script src="js/features/members.js"></script>
 <script src="js/features/rooms.js"></script>
 <script src="js/features/messages.js"></script>
 <script src="js/features/polls.js"></script>
 <script src="js/features/handoff.js"></script>
+<script src="js/features/tasks.js"></script>
+<script src="js/features/care.js"></script>
+<script src="js/features/fronting.js"></script>
 <script src="js/features/system-card.js"></script>
 <script src="js/features/ledger.js"></script>
 <script src="js/features/import-export.js"></script>
+<script src="js/features/arrival.js"></script>
+<script src="js/features/search.js"></script>
+<script src="js/features/timeline.js"></script>
 <script src="js/app.js"></script>
 ```
 
-文件职责：
+主要职责：
 
-- `js/data.js`：常量、localStorage 键名、默认偏好、初始数据、工具函数。
+- `js/data.js`：常量、localStorage 键名、默认偏好、初始数据、基础工具。
+- `js/features/terms.js`：自定义术语系统，提供 `term()`、设置面板填充与静态文案刷新。
 - `js/imageStore.js`：IndexedDB 图片存储封装，暴露 `window.imageStore`。
-- `js/integrity.js`：文本/CSV/Markdown 辅助、消息完整性校验、消息构造、基础查找函数。
-- `js/migrate.js`：主数据结构迁移和默认字段补齐。
-- `js/storage.js`：`LocalStorageAdapter`，负责主数据、偏好、账本的加载保存和 JSON 备份解析。
-- `js/imageMigration.js`：旧 DataURL 图片迁移到 IndexedDB 的控制台工具。
-- `js/imageHealth.js`：图片健康检查、孤儿清理、从 JSON 备份恢复缺失图片的控制台工具。
-- `js/render.js`：偏好应用、列表/聊天/结构视图等渲染逻辑。
-- `js/features/*.js`：成员、群组、消息、投票、交接、系统名片、账本、导入导出等业务功能。
+- `js/integrity.js`：消息文本、导出辅助、校验码、`messageIntegrity()`、`makeMessage()`、基础查找函数。
+- `js/migrate.js`：主数据迁移、旧 JSON 兼容、字段补齐、记录归一化。
+- `js/storage.js`：`LocalStorageAdapter`，负责主数据、偏好、账本加载保存和完整备份解析。
+- `js/imageMigration.js`：旧 DataURL 图片外置到 IndexedDB 的控制台维护工具。
+- `js/imageHealth.js`：图片健康检查、孤儿图片清理、从 JSON 备份修复缺失图片的控制台 API。
+- `js/features/backup-health-ui.js`：备份健康检查 UI，调用 `imageHealth.js` 现有 API。
+- `js/render.js`：偏好应用、侧栏、聊天、结构视图、系统资料、系统名片等渲染。
+- `js/features/*.js`：各功能模块。
 - `js/app.js`：全局 UI 状态、事件绑定、启动流程、自动图片迁移触发。
-
-注意：
-
-- 不使用 `type="module"`。
-- 所有文件共享同一个全局作用域（`window`）。
-- 加载顺序即依赖顺序：后加载的文件可以访问前面文件定义的变量和挂到 `window` 的对象。
 
 ## 3. 全局状态
 
 核心全局状态在 `js/app.js` 顶部定义：
 
-- `data`：运行时主数据对象，包含成员、房间、消息、标签、投票、系统资料等。
-- `prefs`：用户偏好，例如字号、主题、锁定设置、当前视角、是否显示全部私聊。
-- `ledgerRecords`：账本记录数组。
+- `data`：运行时主数据对象，包含成员、房间、消息、标签、议题、前台日志、任务、照护、系统资料等。
+- `prefs`：偏好对象，包含字号、主题、锁定、封面策略、当前视角、私聊管理模式、接续面板入口、自定义术语等。
+- `ledgerRecords`：账本记录数组，独立于主 `data` 存储。
 - `currentRoomId`：当前打开的房间 ID。
 - `tab`：侧边栏当前页签，常见值为 `rooms`、`private`、`members`。
-- `appMode`：当前模式，主要在封面和记录界面之间切换。
-- `pendingMemberAvatar`：成员头像编辑过程中的临时 DataURL、`"__KEEP__"` 或 `null`。
-- `pendingRoomBg`：房间背景编辑过程中的临时 DataURL、`"__KEEP__"` 或 `null`。
-- `pendingChatImage`：发送聊天图片前的临时预览数据。
+- `appMode`：封面 / 记录界面的当前模式。
+- `pendingMemberAvatar`、`pendingRoomBg`、`pendingChatImage`：图片编辑或发送前的临时 DataURL / 保留标记。
 - `pendingSystemCardPayload`、`pendingSystemCardImage`、`pendingSystemCardBg`、`pendingReceivedSystemCard`：系统名片相关临时状态。
 
 ## 4. localStorage 键名
@@ -75,9 +77,6 @@ KEY = "osddDidLocalJournal.v2"
 OLD_KEY = "osddDidLocalJournal.v1"
 ```
 
-- `KEY`：当前版本主数据。
-- `OLD_KEY`：旧版本主数据；`loadAppData()` 会兼容读取，但保存只写 `KEY`。
-
 偏好与账本：
 
 ```js
@@ -85,52 +84,112 @@ PREF_KEY = "osddDidLocalJournal.prefs.v1"
 LEDGER_KEY = "moonLedger.records.v1"
 ```
 
+- `KEY`：当前版本主数据。
+- `OLD_KEY`：旧版主数据兼容读取；保存只写 `KEY`。
 - `PREF_KEY`：用户偏好。
-- `LEDGER_KEY`：账本记录。
+- `LEDGER_KEY`：账本记录。账本仍独立存储，但完整 JSON 备份已经包含 `ledgerRecords`。
 
-图片迁移键名定义在 `js/imageMigration.js`：
+图片迁移相关键名：
 
-- `imageMigrationDone`：值为 `"1"` 时跳过自动迁移。
-- `imageMigrationAt`：迁移完成时间，ISO 字符串。
-- `imageMigrationVersion`：当前写入 `"1"`。
-- `backupBeforeImageMigration.v1`：迁移前主数据备份 JSON 字符串，用于回滚。
+- `imageMigrationDone`
+- `imageMigrationAt`
+- `imageMigrationVersion`
+- `backupBeforeImageMigration.v1`
 
 ## 5. 主数据结构（data 对象）
 
-`data` 由 `js/data.js` 的 `initial`、`js/migrate.js` 的迁移补齐、`js/storage.js` 的加载保存共同维护。主要字段包括：
+`data` 由 `initial`、迁移函数和存储层共同维护。当前主要字段包括：
 
 - `nextSeq`
 - `tags`
 - `messageKinds`
 - `polls`
 - `handoffNotes`
+- `frontingLogs`
+- `tasks`
+- `careLogs`
+- `careChecklist`
 - `systemProfile`
+- `systemProfileVisibility`
 - `memberRelations`
 - `externalSystemCards`
 - `rooms`
 - `members`
 - `messages`
 
-图片相关字段：
+成员 `members[]` 当前支持：
 
-`messages[]`：
+- 基础字段：`id`、`name`、`role`、`status`、`tagId`、`note`。
+- 成员档案 2.0 字段：`pronouns`、`aliases`、`comfortMethods`、`boundaries`、`avoidNotes`、`communicationStyle`、`frontingPreferences`、`customFields`、`statusHistory`、`createdAt`、`updatedAt`。
+- 图片字段：`avatarId` 为新格式主字段，`avatarData` 只作为旧数据兼容 / JSON 导出字段。
 
-- `imageId`：图片存储在 IndexedDB 的 ID。新格式运行时主字段。
-- `imageData`：图片 DataURL。旧格式兼容字段；新聊天图片不再写入。
-- `imageName`、`imageType`：图片元信息。
-- `integrity`：消息完整性校验码，见第 7 节。
+消息 `messages[]` 当前支持：
 
-`members[]`：
+- 基础字段：`id`、`seq`、`roomId`、`speakerId`、`speakerName`、`kind`、`text`、`createdAt`、`integrity`。
+- 图片字段：`imageId`、`imageName`、`imageType`；`imageData` 只作为旧数据兼容 / JSON 导出字段。
 
-- `avatarId`：头像存储在 IndexedDB 的 ID。
-- `avatarData`：头像 DataURL。旧格式兼容字段。
+房间 `rooms[]` 当前支持：
 
-`rooms[]`：
+- `id`、`type`、`memberIds`、`name`、`desc`、`createdAt`。
+- 背景图字段：`backgroundId` 为新格式主字段，`backgroundData` 只作为旧数据兼容 / JSON 导出字段。
 
-- `backgroundId`：背景图存储在 IndexedDB 的 ID。
-- `backgroundData`：背景图 DataURL。旧格式兼容字段。
+议题 / 投票 `polls[]` 当前支持：
 
-## 6. IndexedDB 图片存储
+- `title`、`description`、`options`、`votes`、`comments`。
+- `status`：例如 `open`、`paused`、`closed`、`cancelled`。
+- `voteMode`：例如 `simple`、`consensus`。
+- `deadline`、`reviewAt`、`decisionText`、`createdAt`、`updatedAt`、`closedAt`。
+
+前台日志 `frontingLogs[]` 当前支持：
+
+- `memberIds`、`primaryMemberId`
+- `stateType`：前台、共前台、靠近前台、旁观 / 在场、混合 / 模糊、未知 / 不确定等。
+- `memoryRating`
+- `startAt`、`endAt`
+- `note`、`createdAt`、`updatedAt`
+
+任务 `tasks[]` 当前支持：
+
+- `title`、`detail`
+- `status`：`todo`、`doing`、`paused`、`done`
+- `assignedMemberIds`
+- `dueAt`
+- `source`
+- `linkedHandoffId`
+- `createdAt`、`updatedAt`
+
+照护数据：
+
+- `careLogs[]`：身体 / 需求记录，包括 `hunger`、`thirst`、`sleep`、`pain`、`energy`、`sensory`、`mood`、`meds`、`note`、`createdByMemberId`、`createdAt`。
+- `careChecklist[]`：照护清单项，包括 `title`、`done`、`createdAt`、`updatedAt`。
+
+系统资料：
+
+- `systemProfile`：系统简介、边界、安抚方式、安全提醒等记录。
+- `systemProfileVisibility`：公开资料分级 / 隐私桶设置，只影响应用内展示和导出，不是加密隔离。
+- `memberRelations`：成员关系记录。
+- `externalSystemCards`：保存的外部系统名片，不合并到本系统资料。
+
+## 6. prefs 结构
+
+`prefs` 主要字段包括：
+
+- `fontSize`
+- `dark`
+- `lockHash`
+- `useBiometric`
+- `webauthnCredentialId`
+- `resetToCover`
+- `lastAppMode`
+- `currentViewMemberId`
+- `showAllPrivateRooms`
+- `privateRoomNoticeSeen`
+- `showArrivalOnEnter`
+- `terms`
+
+`showArrivalOnEnter` 控制进入记录界面时是否显示接续面板。`terms` 保存自定义术语，只影响界面文案，不修改历史内容或 JSON key。
+
+## 7. IndexedDB 图片存储
 
 `js/imageStore.js` 封装图片存储：
 
@@ -139,7 +198,7 @@ LEDGER_KEY = "moonLedger.records.v1"
 - objectStore：`images`
 - keyPath：`id`
 
-每条图片记录字段：
+每条图片记录结构：
 
 ```js
 { id, blob, mime, name, createdAt }
@@ -151,57 +210,81 @@ ID 命名规则：
 - 成员头像：`avatar-${member.id}`
 - 房间背景：`roombg-${room.id}`
 
-`window.imageStore` 暴露 API：
+`window.imageStore` 暴露：
 
-写入类：
+- `putImage({ id, blob, mime, name })`
+- `getImageBlob(id)`
+- `getImageUrl(id)`
+- `deleteImage(id)`
+- `listImages()`
+- `dataUrlToBlob(dataUrl)`
+- `blobToDataUrl(blob)`
+- `revokeImageUrl(id)`
+- `clearImageCache()`
+- `selfTest()`
 
-- `putImage({ id, blob, mime, name })`：写入或覆盖一张图片。
-- `deleteImage(id)`：删除一张图片。
+运行时新写入图片仍进入 IndexedDB，主 `data` 只长期保存 `imageId/avatarId/backgroundId`，不长期写 DataURL。
 
-读取类：
+## 8. 图片导入导出语义
 
-- `getImageBlob(id)`：返回 `Blob` 或 `null`。
-- `getImageUrl(id)`：返回 objectURL；内部用 `urlCache` 缓存，避免重复 `URL.createObjectURL`。
-- `listImages()`：返回摘要数组 `[{ id, mime, name, createdAt, size }]`，不包含 `Blob`。
+JSON 完整备份和 UI 完整 JSON 导出都使用同一语义：
 
-辅助类：
+- `formatExportJsonAsync()` 导出 UI JSON。
+- `storage.exportBackup()` 导出程序化完整备份。
+- 两者都会在导出对象的深拷贝上调用 `hydrateImagesForJsonExport()`。
+- hydrate 会读取 IndexedDB Blob，并在导出副本中补齐 `imageData/avatarData/backgroundData`。
+- hydrate 不修改运行时 `data`。
 
-- `dataUrlToBlob(dataUrl)`：DataURL 转 `Blob`。
-- `blobToDataUrl(blob)`：`Blob` 转 DataURL，返回 `Promise`。
-- `revokeImageUrl(id)`：释放指定 ID 的 objectURL 缓存。
-- `clearImageCache()`：释放全部 objectURL 缓存。
-- `selfTest()`：控制台自测，返回 `{ ok, put, read, dataUrl, objectUrl, deleted, dataUrlToBlob, pngMime }` 等结果。
+JSON 导入路径：
 
-## 7. 消息完整性校验（messageIntegrity）
-
-`messageIntegrity(m)` 定义在 `js/integrity.js`。
-
-旧格式：消息没有 `imageId` 时，校验输入包括 `imageData`：
-
-```js
-checksum([
-  m.seq, m.id, m.roomId, m.speakerId, m.speakerName, m.kind,
-  m.text, m.imageName, m.imageType, m.imageData, m.createdAt
-].map(v=>v||"").join("\\u001f"))
+```text
+importBackupFile(file)
+  -> storage.importBackup(parsed)
+  -> externalizeImagesAfterJsonImport(incoming)
+  -> data = incoming
+  -> save()
+  -> render()
 ```
 
-新格式：消息有 `imageId` 时，使用 `_imgVer = 2`，校验输入包括 `imageId`：
+导入规则：
 
-```js
-checksum([
-  m.seq, m.id, m.roomId, m.speakerId, m.speakerName, m.kind,
-  m.text, m.imageName, m.imageType, m.imageId, _imgVer, m.createdAt
-].map(v=>v||"").join("\\u001f"))
-```
+- 如果导入 JSON 中有 `imageData`，写入 IndexedDB，设置 `imageId`，删除 `imageData`。
+- 如果有 `avatarData`，写入 IndexedDB，设置 `avatarId`，删除 `avatarData`。
+- 如果有 `backgroundData`，写入 IndexedDB，设置 `backgroundId`，删除 `backgroundData`。
+- 如果新版 JSON 同时包含 ID 和 DataURL，优先用 DataURL 恢复同 ID 图片。
+- `externalizeImagesAfterJsonImport()` 完成后会按现有规则重算所有消息 `integrity`。
+- JSON 导入失败不会覆盖当前 `data`。
 
-合法重算场景：
+复盘报告和时间线只读取主数据摘要，只标记“含图片”，不读取 IndexedDB Blob，也不导出图片内容或 DataURL。
 
-1. 图片外置迁移（`imageData` → `imageId`）时，`runImageMigrationToIndexedDB()` 会对所有消息重算 `integrity`。
-2. JSON 导入后，`externalizeImagesAfterJsonImport()` 会对所有消息重算 `integrity`。
+## 9. messageIntegrity 与 nextSeq
 
-## 8. 启动流程（boot）
+`messageIntegrity(m)` 定义在 `js/integrity.js`。规则保持不变：
 
-`boot()` 定义在 `js/app.js`，当前执行顺序：
+- 没有 `imageId` 的旧格式消息，校验输入包含 `imageData`。
+- 有 `imageId` 的新格式消息，校验输入包含 `imageId` 和 `_imgVer = 2`。
+- 不应随意改变输入字段集合。
+- 如果未来必须改变规则，需要显式版本标记并通过迁移重算。
+
+`message.seq` 是消息校验码序号的来源，界面显示为 `seqCode(m)`，例如 `0001`。
+
+`nextSeq` 修复规则：
+
+- `calculateNextSeqFromMessages(messages)` 根据现有消息最大 `seq` 计算下一号。
+- `resetNextSeqFromMessages()` 会从剩余 `messages` 重算 `data.nextSeq`。
+- 删除消息、清空聊天、清空数据或删除房间内消息后会重算。
+- 当 `messages` 为空时，`nextSeq` 回到 `1`，下一条消息校验码从 `0001` 开始。
+- 这些修复不改变 `messageIntegrity` 规则。
+
+合法重算 integrity 的场景：
+
+- 图片外置迁移 `imageData -> imageId`。
+- JSON 导入 externalize 图片之后。
+- 新建消息时由 `makeMessage()` 生成。
+
+## 10. 启动与渲染
+
+`boot()` 定义在 `js/app.js`，当前流程：
 
 1. `await storage.init()`
 2. `data = await load()`
@@ -212,221 +295,101 @@ checksum([
 7. `await closeDuePolls()`
 8. `await runAutoImageMigrationIfNeeded()`
 9. `applyPrefs()`
-10. `render()`
-11. `applyAppMode()`
+10. `applyTermsToStaticLabels()`
+11. `render()`
+12. `applyAppMode()`
 
-`boot().catch(...)` 会在启动失败时记录错误并提示数据加载失败。
+`render()` 在 `js/render.js`，负责刷新视角、列表、发言身份、分类、聊天、投票、交接、系统档案、成员关系、结构视图、系统名片和前台状态。
 
-## 9. 自动图片迁移（runAutoImageMigrationIfNeeded）
+`renderChat()` 必须保持 async + `_renderChatSeq` 防竞态结构。图片 URL 解析优先走 `imageId/avatarId/backgroundId` 的 IndexedDB objectURL；旧 DataURL 仅作为兼容回退。图片缺失时显示 placeholder，不让渲染崩溃。
 
-`runAutoImageMigrationIfNeeded()` 定义在 `js/app.js`，不挂到 `window`。
+## 11. 当前功能模块
 
-触发和守卫逻辑：
+P0-P2 当前模块包括：
 
-- 如果 `localStorage.getItem("imageMigrationDone") === "1"`，直接跳过。
-- 如果当前 `data` 中没有任何 `imageData`、`avatarData`、`backgroundData`，写入：
-  - `imageMigrationDone = "1"`
-  - `imageMigrationAt = new Date().toISOString()`
-  - `imageMigrationVersion = "1"`
-  然后跳过。
-- 否则调用 `window.runImageMigrationToIndexedDB({ confirm: true })`。
-- 迁移成功时，迁移函数内部写入 `imageMigrationDone` 等标记。
-- 迁移失败时只 `console.error`，不 `alert`，不阻断后续 `render()`，下次启动仍可重试。
-- 不自动运行健康检查。
-- 不自动清理孤儿图片。
+- 成员 / 群组 / 私聊基础管理。
+- 成员档案 2.0：扩展字段、自定义字段、状态历史、结构视图隐私处理、头像外置。
+- 前台日志 2.0：补录、编辑、删除、当前进行中记录、未知 / 混合 / 共前台等状态。
+- 接续面板：进入后汇总前台、交接、消息、投票、任务和照护记录；支持管理模式删除来源记录。
+- 交接模板 + 任务接力：模板填充、交接创建任务、任务开始 / 暂停 / 恢复 / 完成 / 删除。
+- 高级搜索：内存聚合搜索消息、成员扩展字段、房间、交接、投票、前台、任务；支持跳转和消息高亮。
+- 投票升级为议题 / 决议 / 复盘：议题说明、投票理由、暂停 / 恢复 / 取消、决议文本、复盘时间。
+- 公开资料分级 / 隐私桶：`systemProfileVisibility` 控制应用内展示和脱敏导出，不是加密隔离。
+- 系统名片：默认只包含可公开字段；可保存外部系统名片，不合并到本系统资料。
+- 身体照护板 / 需求看板：照护记录、照护清单，可选写入聊天 `kind="状态"`。
+- 备份健康检查 UI：检查图片引用、缺失图片、孤儿图片；修复和清理前均需确认。
+- 自定义术语系统：自定义成员、系统、前台、交接、任务、照护、接续等界面词。
+- 时间线总览 + 月度回顾：只读聚合消息、前台、交接、议题、任务、照护；不聚合账本、不读图片 Blob、不修改 `data`。
+- 复盘报告导出：Markdown / TXT，只读生成；支持日期范围、章节开关、脱敏、排除私聊、隐藏成员名。
+- 账本伪装首页：账本记录仍存放在 `LEDGER_KEY`，业务 UI 不随 P2 改动。
 
-## 10. 渲染管线（render）
+## 12. 导入导出
 
-渲染逻辑在 `js/render.js`。
+普通导出：
 
-关键设计：
+- Markdown / TXT / CSV 支持脱敏导出。
+- JSON 用于完整备份，默认保留全量数据；完整 JSON 备份包含图片 DataURL hydrate 结果。
+- 局部 current / room JSON 不默认带出 `ledgerRecords`、`tasks`、`careLogs`、`careChecklist`。
+- 完整 all JSON 包含 `ledgerRecords`。
 
-- `render()` 是异步函数，会依次调用列表、发言者、分类、聊天、投票、交接、系统资料、关系、结构视图、系统名片面板等渲染函数。
-- `renderChat()` 是异步函数。
-- 使用 `_renderChatSeq` 防竞态：每次 `renderChat()` 调用递增序号；异步图片 URL 读取完成后检查序号是否仍是最新，若已被新一轮渲染抢占，则放弃写 DOM。
+复盘报告导出：
 
-图片 URL 解析：
-
-```js
-resolveStoredImageUrl(record, idKey, dataKey)
-```
-
-- 优先读取 `record[idKey]`，例如 `imageId`、`avatarId`、`backgroundId`。
-- 调用 `window.imageStore.getImageUrl()` 获取 objectURL。
-- 如果 IDB 中缺失 Blob，会 `console.warn`，并回退到旧字段 `record[dataKey]`。
-- 两者都无则返回空字符串。
-
-批量预取：
-
-```js
-buildStoredImageUrlMap(records, idKey, dataKey)
-```
-
-- 按图片 ID 批量预取一组记录的图片 URL。
-- 返回 `Map`，同时按 `record.id` 和图片 ID 存储 URL。
-- 避免在消息循环内部逐条 `await`。
-
-图片缺失显示：
-
-- `bubbleContent(m, imageUrl)` 定义在 `js/integrity.js`。
-- 如果有可用 URL，渲染 `<img>`。
-- 如果有 `m.imageId` 但没有可用 URL，渲染 `<div class="img-placeholder">图片已丢失</div>`。
-- 不因图片缺失导致渲染崩溃。
-
-## 11. 图片保存路径（新图片写入流程）
-
-聊天图片：`sendChatImage()` 在 `js/features/messages.js`。
-
-流程：
-
-1. `pendingChatImage.dataUrl` 保存临时预览。
-2. `window.imageStore.dataUrlToBlob(dataUrl)` 转 Blob。
-3. `window.imageStore.putImage({ id: "msgimg-" + msgId, blob, mime, name })` 写入 IDB。
-4. 新消息只写入 `imageId`、`imageName`、`imageType`，不写 `imageData`。
-5. 如果写入 IDB 失败，`alert` 用户并停止创建消息。
-
-成员头像：`saveMemberBtn.onclick` 内的 `applyAvatarToMember()` 在 `js/app.js`。
-
-- `pendingMemberAvatar === "__KEEP__"`：保留原头像。
-- `pendingMemberAvatar === null`：删除 `avatarId/avatarData` 字段，并尝试 `imageStore.deleteImage(oldId)`。
-- 传入 DataURL 时，写入 `avatar-${member.id}`，设置 `member.avatarId`，删除 `member.avatarData`。
-
-房间背景：`saveRoomBtn.onclick` 内的 `applyBgToRoom()` 在 `js/app.js`。
-
-- `pendingRoomBg === "__KEEP__"`：保留原背景。
-- `pendingRoomBg === null`：删除 `backgroundId/backgroundData` 字段，并尝试 `imageStore.deleteImage(oldId)`。
-- 传入 DataURL 时，写入 `roombg-${room.id}`，设置 `room.backgroundId`，删除 `room.backgroundData`。
-
-## 12. JSON 导入导出
-
-导出路径在 `js/features/import-export.js`。
-
-`formatExportJsonAsync()`：
-
-1. 根据导出范围取 `selected.rooms` 和 `selected.messages`。
-2. 用 `JSON.parse(JSON.stringify(...))` 深拷贝导出对象，不修改运行时 `data`。
-3. 调用 `hydrateImagesForJsonExport(exportObj)`。
-4. 对有 `imageId/avatarId/backgroundId` 但无 DataURL 的记录，从 IndexedDB 读取 Blob，再用 `blobToDataUrl()` 写回深拷贝对象的 `imageData/avatarData/backgroundData`。
-5. 如果部分图片在 IDB 缺失，会 `console.warn` 并 `alert` 用户备份可能不完整；导出仍继续。
-6. 导出 JSON 可同时包含 `imageId` 和 `imageData`，用于完整单文件备份。
-
-导入路径：
-
-```text
-importBackupFile(file)
-  → storage.importBackup()
-  → externalizeImagesAfterJsonImport(incoming)
-  → data = incoming
-  → save()
-  → render()
-```
-
-`externalizeImagesAfterJsonImport(appData)`：
-
-- 遍历 `messages`：如果有 `imageData`，写入 IDB，设置 `imageId`，删除 `imageData`。
-- 遍历 `members`：如果有 `avatarData`，写入 IDB，设置 `avatarId`，删除 `avatarData`。
-- 遍历 `rooms`：如果有 `backgroundData`，写入 IDB，设置 `backgroundId`，删除 `backgroundData`。
-- 如果新版 JSON 同时有 ID 和 DataURL，优先用 DataURL 写入原 ID。
-- 对所有 `messages` 重算 `integrity`。
-- 全部成功后才覆盖运行时 `data`。
-- 任何步骤失败会进入 `catch`，`console.error` 并 `alert`，不会覆盖当前 `data`。
-
-兼容性：
-
-- 旧版 JSON 只有 DataURL：导入后自动外置到 IDB。
-- 新版 JSON 有 ID + DataURL：导入时用 DataURL 恢复图片到 IDB。
-- 运行时快照只有 ID：导出时 hydrate 补齐 DataURL。
+- 格式：`review-md`、`review-txt`。
+- 默认日期范围：当前自然月。
+- 可选章节：概览统计、时间线摘要、聊天摘要、前台记录、交接、议题 / 投票、任务、照护记录。
+- 脱敏支持成员别名、排除私聊、隐藏投票评论。
+- 不导出系统档案、成员 customFields、隐私桶配置、系统名片或图片内容。
+- 脱敏不是 NLP 脱敏；用户导出前仍需人工确认 note / 原文中是否包含敏感内容。
 
 ## 13. 控制台维护工具
 
 `js/imageMigration.js`：
 
 - `previewImageMigration()`
-  - 只统计当前 `data` 中有多少 `imageData/avatarData/backgroundData` 待迁移。
-  - 不写数据。
 - `runImageMigrationToIndexedDB({ confirm: true })`
-  - 执行旧图片外置迁移。
-  - 必须传 `confirm: true`。
-  - 迁移前写入 `backupBeforeImageMigration.v1`。
-  - 把 DataURL 写入 IDB，改为 `imageId/avatarId/backgroundId`，删除 DataURL 字段。
-  - 重算消息 integrity。
-  - 保存主数据并写入迁移标记。
 - `rollbackImageMigrationFromBackup()`
-  - 从 `backupBeforeImageMigration.v1` 恢复主数据。
-  - 清除迁移标记。
-  - 不删除 IDB 图片。
 
 `js/imageHealth.js`：
 
 - `runImageStorageHealthCheck()`
-  - 扫描 `data` 中所有 `imageId/avatarId/backgroundId`。
-  - 检查 IDB 中是否存在对应 Blob。
-  - 同时找出 IDB 中不再被 `data` 引用的孤儿图片。
-  - 返回 `{ ok, referenced, missing, orphaned, indexedDbTotal }`。
 - `listImageStoreRecords()`
-  - 列出 IDB 所有图片摘要 `[{ id, mime, name, createdAt, size }]`。
-  - 不返回 Blob。
 - `cleanOrphanImages({ confirm: true })`
-  - 清理 IDB 中 `data` 不再引用的孤儿图片。
-  - 必须传 `confirm: true`。
-  - 不修改 `data`。
 - `previewRepairMissingImagesFromBackupJson(backupJsonOrObject)`
-  - 只读操作。
-  - 统计当前 missing 图片中有多少能从备份 JSON 的 DataURL 恢复。
-  - 不写 IDB，不改 `data`，不写 localStorage。
 - `repairMissingImagesFromBackupJson(backupJsonOrObject, options)`
-  - 从备份 JSON 顶层 `messages/members/rooms` 中读取 `imageData/avatarData/backgroundData`。
-  - 把当前 missing 图片写回 IDB。
-  - `options.overwrite = false` 为默认值；已有同 ID 图片时跳过。
-  - 返回 `{ ok, repaired, stillMissing, skipped, errors }`。
 - `repairMissingImagesFromBackupFile(file, options)`
-  - 接收 `File` 对象。
-  - 用 `FileReader` 读取 JSON 文本。
-  - 调用 `repairMissingImagesFromBackupJson()`。
-  - 返回 `Promise`，resolve 值与 `repairMissingImagesFromBackupJson()` 相同。
 
-## 14. 不变约束（代码冻结规则）
+这些工具不会自动运行。备份健康检查 UI 只调用现有 imageHealth API，不直接改主 `data`；清理和修复需要用户确认。
+
+## 14. 不变约束（维护规则）
 
 后续修改不应打破以下规则：
 
-1. 不使用 `type="module"`。所有 JS 文件用普通 `<script src>` 加载，共享 `window` 作用域。
-2. 不引入 CDN、npm、打包工具。页面可以通过 `file://` 打开，也可以通过本地 HTTP 服务打开。
-3. 新写入路径不得再把图片 DataURL 长期写入 `data`。
-4. `imageData/avatarData/backgroundData` 只作为兼容输入和导出备份字段存在：
-   - 渲染时作为 IDB 缺失或旧数据的回退来源。
-   - 导出时由 `hydrateImagesForJsonExport()` 从 IDB 补回到导出对象，不改运行时 `data`。
-   - 导入时由 `externalizeImagesAfterJsonImport()` 读取后立即外置为 ID，并从 `data` 中删除。
-   - 启动迁移后，运行时 `data` 不应长期保留 DataURL 字段。
-5. 图片存储在 IndexedDB（`moon-images` / `images` store），不长期存储在 localStorage 主数据里。
-6. `messageIntegrity` 的输入字段集合不能随意修改。
-7. 改变 integrity 规则必须使用版本标记（当前图片新格式为 `_imgVer = 2`），并在迁移时重算所有消息。
-8. `renderChat()` 必须保持 async + `_renderChatSeq` 防竞态结构。
-9. 图片失败处理规则：
-   - 新聊天图片写入 `imageStore` 失败：不能创建消息，必须 `alert` 用户。
-   - 成员/房间删除旧图片时，`imageStore.deleteImage(oldId).catch(()=>{})` 不阻塞保存。
-   - 不应创建“`data` 中有新 `imageId` 但 IDB 写入失败”的新数据。
-10. JSON 导出必须尽量包含 `imageData/avatarData/backgroundData`，保证单文件完整备份语义。
-11. JSON 导入失败时不覆盖当前 `data`。
-12. 健康检查、孤儿清理、备份恢复工具都是控制台维护工具，不应在页面加载或 `boot()` 中自动运行。
+1. 不使用 `type="module"`。
+2. 不引入 CDN、npm、打包工具、账号、云同步或远程 API。
+3. 继续保持 local-only / offline-first。
+4. 新写入路径不得把图片 DataURL 长期写入主 `data`。
+5. `imageData/avatarData/backgroundData` 只作为旧数据兼容、导入输入和完整 JSON 导出字段存在。
+6. 图片长期存储在 IndexedDB，不长期存储在 localStorage 主数据里。
+7. 不随意修改 `messageIntegrity` 输入字段集合。
+8. `renderChat()` 必须保持 async + `_renderChatSeq`。
+9. JSON 完整备份必须尽量 hydrate 图片，保持单文件恢复语义。
+10. JSON 导入失败不能覆盖当前 `data`。
+11. 不自动运行健康检查、孤儿清理或备份修复。
+12. 不把“接续面板”改回旧名称。
+13. 不把 visibility 当作安全加密边界；它只影响应用内展示和导出。
 
 ## 15. 已知局限与后续方向
 
 当前架构的已知局限：
 
-- localStorage 仍然是主数据存储；图片已经外置到 IndexedDB，但消息、成员、房间等结构化数据仍保存在 localStorage。
-- 数据量非常大时，例如几千条消息，主数据 JSON 的加载、保存和整体迁移仍可能变慢。
-- 没有虚拟滚动；消息数极多时，聊天 DOM 可能变大。
-- 没有全文搜索。
+- localStorage 仍是主结构化数据存储；图片已经外置到 IndexedDB。
+- 目前已有内存高级搜索，但没有持久化全文索引。
+- 数据量极大时，加载、保存、迁移和搜索仍可能需要 IndexedDB / SQLite 结构化迁移。
+- 没有虚拟滚动；消息和时间线极大时 DOM 可能变重。
+- 复盘报告脱敏不是 NLP 脱敏，导出前仍需人工确认敏感内容。
+- `systemProfileVisibility` 和成员自定义字段 visibility 只影响应用内展示和导出，不是加密隔离。
+- 复盘报告和月度回顾只做本地记录统计，不做诊断、治疗建议或危机干预判断。
 
 后续迁移 Flutter 或原生壳时，`imageStore.js` 的 `putImage/getImageBlob/getImageUrl` 可以对应到平台 bridge 或原生持久化调用；其他业务文件目前主要依赖 `window.imageStore` API。
 
-关于 SQLite：
-
-SQLite 不是当前救火项。现有架构已经通过 IndexedDB 图片外置解决了 localStorage 膨胀和 DataURL 内存压力的主要问题。只有在以下真实需求出现时，再启动 SQLite 迁移更合适：
-
-- 消息数量增长到查询、加载或渲染明显变慢。
-- 需要全文搜索。
-- 需要打包为原生应用，并希望结构化数据使用平台级持久化存储。
-- 需要跨进程访问同一份数据。
-
-在这些需求出现前，不建议提前引入 SQLite 复杂度。
+SQLite 不是当前默认方向。只有在消息量、搜索需求、跨进程访问或原生打包需求真实出现后，再引入结构化数据库会更合适。
