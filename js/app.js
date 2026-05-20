@@ -1,7 +1,7 @@
     /* ── Tauri 桌面端桥接：让现有 MoonBridge 接口在 Tauri 下生效 ── */
     (function setupTauriBridge(){if(!window.__TAURI_INTERNALS__)return; const invoke=window.__TAURI_INTERNALS__.invoke; if(typeof invoke!=="function")return; window.MoonBridge=window.MoonBridge||{}; window.MoonBridge.authenticate=function(){invoke("moon_authenticate").then(()=>{window.onMoonAuthResult&&window.onMoonAuthResult(true,"");}).catch(err=>{const msg=String(err?.message||err||""); const display=/cancel|user.*cancel|取消/i.test(msg)?"已取消":("验证失败："+(msg||"未知错误")); window.onMoonAuthResult&&window.onMoonAuthResult(false,display);});};})();
     (function setupViewportHeight(){const sync=()=>{document.body.style.setProperty("--app-height",`${window.innerHeight}px`);}; sync(); window.addEventListener("resize",sync,{passive:true}); window.addEventListener("orientationchange",()=>setTimeout(sync,240),{passive:true}); if(window.visualViewport)window.visualViewport.addEventListener("resize",sync,{passive:true});})();
-    let data; let prefs; let ledgerRecords=[]; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover";
+    let data; let prefs; let ledgerRecords=[]; let editingLedgerId=null; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover";
     const list=document.getElementById("list"), messages=document.getElementById("messages"), roomName=document.getElementById("roomName"), roomDesc=document.getElementById("roomDesc"), speaker=document.getElementById("speaker"), kind=document.getElementById("kind"), search=document.getElementById("search"), fontSize=document.getElementById("fontSize"), fontSizeValue=document.getElementById("fontSizeValue"), themeBtn=document.getElementById("themeBtn"), contextMenu=document.getElementById("contextMenu"), imageInput=document.getElementById("imageInput"), importInput=document.getElementById("importInput"), memberAvatarInput=document.getElementById("memberAvatarInput"), roomBgInput=document.getElementById("roomBgInput"), drawerBtn=document.getElementById("drawerBtn"), drawerBackdrop=document.getElementById("drawerBackdrop");
     function showMenu(e,items){e.preventDefault(); e.stopPropagation(); contextMenu.innerHTML=items.map((item,i)=>`<button class="${item.danger?"danger-action":""}" data-i="${i}">${esc(item.label)}</button>`).join(""); contextMenu.style.display="block"; const rect=contextMenu.getBoundingClientRect(); contextMenu.style.left=Math.min(e.clientX,window.innerWidth-rect.width-8)+"px"; contextMenu.style.top=Math.min(e.clientY,window.innerHeight-rect.height-8)+"px"; contextMenu.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{const item=items[Number(btn.dataset.i)]; closeMenu(); item.action();});}
     function closeMenu(){contextMenu.style.display="none"; contextMenu.innerHTML="";}
@@ -46,8 +46,65 @@
     document.getElementById("showAllPrivateRooms").onchange=async e=>{prefs.showAllPrivateRooms=e.target.checked; await savePrefs(); renderList();};
     document.getElementById("showArrivalOnEnter").onchange=async e=>{prefs.showArrivalOnEnter=e.target.checked; await savePrefs();};
     document.getElementById("viewSelect").onchange=async e=>{prefs.currentViewMemberId=e.target.value||""; await savePrefs(); const r=room(); if(r&&isPrivateRoom(r)&&!isRoomVisibleInView(r)){const fallback=data.rooms.find(x=>!isPrivateRoom(x))||data.rooms[0]; currentRoomId=fallback?.id||"main"; setTab("rooms");} else {renderList();} render();};
-    document.getElementById("ledgerDate").value=typeof ledgerLocalDate==="function"?ledgerLocalDate():new Date().toISOString().slice(0,10);
-    document.getElementById("ledgerForm").addEventListener("submit",async e=>{e.preventDefault(); const amount=Number(document.getElementById("ledgerAmount").value); if(!Number.isFinite(amount)||amount<0){alert("请填写有效金额。");return;} const savedAt=now(); const records=[...(ledgerRecords||[])]; records.push(normalizeLedgerRecord({id:makeId(),type:document.getElementById("ledgerType").value,amount,category:document.getElementById("ledgerCategory").value.trim()||"未分类",date:document.getElementById("ledgerDate").value||(typeof ledgerLocalDate==="function"?ledgerLocalDate():new Date().toISOString().slice(0,10)),note:document.getElementById("ledgerNote").value.trim(),createdAt:savedAt,updatedAt:savedAt})); if(!(await saveLedger(records)))return; document.getElementById("ledgerAmount").value=""; document.getElementById("ledgerCategory").value=""; document.getElementById("ledgerNote").value=""; renderLedger();});
+    if(window.setLedgerInitialInputValues)window.setLedgerInitialInputValues();
+    const ledgerForm=document.getElementById("ledgerForm");
+    const ledgerValue=id=>document.getElementById(id)?.value||"";
+    if(ledgerForm)ledgerForm.addEventListener("submit",async e=>{
+      e.preventDefault();
+      const rawAmount=ledgerValue("ledgerAmount").trim();
+      const amount=Number(rawAmount);
+      if(rawAmount===""||!Number.isFinite(amount)||amount<0){alert("请填写有效金额。");return;}
+      const savedAt=now();
+      const payload={
+        type:ledgerValue("ledgerType")==="income"?"income":"expense",
+        amount,
+        category:ledgerValue("ledgerCategory").trim()||"未分类",
+        account:ledgerValue("ledgerAccount").trim(),
+        paymentMethod:ledgerValue("ledgerPaymentMethod").trim(),
+        date:ledgerValue("ledgerDate")||(window.ledgerToday?window.ledgerToday():new Date().toISOString().slice(0,10)),
+        note:ledgerValue("ledgerNote").trim()
+      };
+      let records=normalizeLedgerRecords(ledgerRecords||[]);
+      if(editingLedgerId){
+        const index=records.findIndex(record=>record.id===editingLedgerId);
+        if(index<0){alert("没有找到要修改的收支记录。"); editingLedgerId=null; if(window.resetLedgerForm)window.resetLedgerForm(); renderLedger(); return;}
+        records[index]=normalizeLedgerRecord({...records[index],...payload,id:records[index].id,createdAt:records[index].createdAt||savedAt,updatedAt:savedAt});
+      }else{
+        records.push(normalizeLedgerRecord({id:makeId(),...payload,createdAt:savedAt,updatedAt:savedAt}));
+      }
+      if(!(await saveLedger(records)))return;
+      editingLedgerId=null;
+      if(window.resetLedgerForm)window.resetLedgerForm();
+      renderLedger();
+    });
+    const ledgerTypeInput=document.getElementById("ledgerType"); if(ledgerTypeInput)ledgerTypeInput.addEventListener("change",()=>window.syncLedgerCategoryOptions&&window.syncLedgerCategoryOptions());
+    const ledgerCancelEditBtn=document.getElementById("ledgerCancelEditBtn"); if(ledgerCancelEditBtn)ledgerCancelEditBtn.addEventListener("click",()=>{editingLedgerId=null; if(window.resetLedgerForm)window.resetLedgerForm(); renderLedger();});
+    ["ledgerViewMode","ledgerViewDate","ledgerViewMonth","ledgerViewYear","ledgerTypeFilter"].forEach(id=>{const el=document.getElementById(id); if(el)el.addEventListener("change",()=>renderLedger());});
+    const ledgerCategoryFilter=document.getElementById("ledgerCategoryFilter"); if(ledgerCategoryFilter){ledgerCategoryFilter.addEventListener("input",()=>renderLedger()); ledgerCategoryFilter.addEventListener("change",()=>renderLedger());}
+    const ledgerResetFilterBtn=document.getElementById("ledgerResetFilterBtn"); if(ledgerResetFilterBtn)ledgerResetFilterBtn.addEventListener("click",()=>{if(window.resetLedgerFilters)window.resetLedgerFilters(); renderLedger();});
+    const ledgerListEl=document.getElementById("ledgerList");
+    if(ledgerListEl)ledgerListEl.addEventListener("click",async e=>{
+      const btn=e.target.closest("[data-ledger-action][data-ledger-id]");
+      if(!btn||!ledgerListEl.contains(btn))return;
+      const id=btn.dataset.ledgerId;
+      const action=btn.dataset.ledgerAction;
+      const records=normalizeLedgerRecords(ledgerRecords||[]);
+      if(action==="edit"){
+        const record=records.find(item=>item.id===id);
+        if(!record)return;
+        editingLedgerId=record.id;
+        if(window.populateLedgerForm)window.populateLedgerForm(record);
+        return;
+      }
+      if(action==="delete"){
+        if(!confirm("确认删除这条收支记录吗？"))return;
+        const next=records.filter(item=>item.id!==id);
+        if(next.length===records.length)return;
+        if(!(await saveLedger(next)))return;
+        if(editingLedgerId===id){editingLedgerId=null; if(window.resetLedgerForm)window.resetLedgerForm();}
+        renderLedger();
+      }
+    });
     const ledgerExportJsonBtn=document.getElementById("ledgerExportJsonBtn"); if(ledgerExportJsonBtn)ledgerExportJsonBtn.onclick=()=>window.exportLedgerJson&&window.exportLedgerJson();
     const ledgerExportCsvBtn=document.getElementById("ledgerExportCsvBtn"); if(ledgerExportCsvBtn)ledgerExportCsvBtn.onclick=()=>window.exportLedgerCsv&&window.exportLedgerCsv();
     const ledgerImportJsonBtn=document.getElementById("ledgerImportJsonBtn"); const ledgerImportJsonInput=document.getElementById("ledgerImportJsonInput");

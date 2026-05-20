@@ -13,7 +13,89 @@
   <link rel="stylesheet" href="styles.css?p103=1&p304=1">
 </head>
 <body>
-  <div class="cover-app" id="coverApp"><div class="cover-head"><div><h1>月之暗面</h1><p class="sub">本月收支记录</p></div><button class="light cover-more" id="coverSettingsBtn" type="button" title="设置" aria-label="设置">&#9881;</button></div><div class="cover-main"><div class="cover-summary"><div><span>收入</span><strong id="ledgerIncome">0.00</strong></div><div><span>支出</span><strong id="ledgerExpense">0.00</strong></div><div><span>结余</span><strong id="ledgerBalance">0.00</strong></div></div><form class="cover-form" id="ledgerForm"><div class="row"><select id="ledgerType"><option value="expense">支出</option><option value="income">收入</option></select><input id="ledgerAmount" inputmode="decimal" placeholder="金额" /></div><div class="row"><input id="ledgerCategory" placeholder="分类，例如 餐饮、交通、工资" /><input id="ledgerDate" type="date" /></div><input id="ledgerNote" placeholder="备注" /><button type="submit">记一笔</button></form><div class="cover-list"><strong>最近记录</strong><div id="ledgerList"></div></div><div class="ledger-tools"><strong>账本备份</strong><div class="ledger-actions"><button class="light" id="ledgerExportJsonBtn" type="button">导出账本备份</button><button class="light" id="ledgerExportCsvBtn" type="button">导出 CSV</button><button id="ledgerImportJsonBtn" type="button">导入账本备份</button><input id="ledgerImportJsonInput" type="file" accept="application/json,.json" hidden /></div></div></div></div>
+  <div class="cover-app" id="coverApp">
+    <div class="cover-head">
+      <div>
+        <h1>本地账本</h1>
+        <p class="sub" id="ledgerHeaderSubtitle">今日收支</p>
+      </div>
+      <button class="light cover-more" id="coverSettingsBtn" type="button" title="设置" aria-label="设置">&#9881;</button>
+    </div>
+    <div class="cover-main">
+      <section class="ledger-panel ledger-overview">
+        <div class="ledger-section-head">
+          <div>
+            <h2 id="ledgerSummaryTitle">今日收支</h2>
+            <p>收支统计只根据当前筛选结果计算。</p>
+          </div>
+        </div>
+        <div class="ledger-summary-grid">
+          <div class="ledger-stat-card primary"><span id="ledgerExpenseLabel">支出合计</span><strong id="ledgerExpense">0.00</strong></div>
+          <div class="ledger-stat-card"><span>收入合计</span><strong id="ledgerIncome">0.00</strong></div>
+          <div class="ledger-stat-card"><span>结余</span><strong id="ledgerBalance">0.00</strong></div>
+          <div class="ledger-stat-card"><span>记录条数</span><strong id="ledgerRecordCount">0</strong></div>
+        </div>
+      </section>
+      <form class="ledger-panel ledger-form" id="ledgerForm">
+        <div class="ledger-section-head">
+          <div>
+            <h2 id="ledgerFormTitle">新增收支记录</h2>
+            <p>金额可以为 0，备注可留空。</p>
+          </div>
+        </div>
+        <div class="ledger-form-grid">
+          <label>类型<select id="ledgerType"><option value="expense">支出</option><option value="income">收入</option></select></label>
+          <label>金额<input id="ledgerAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></label>
+          <label>日期<input id="ledgerDate" type="date" /></label>
+          <label>分类<input id="ledgerCategory" list="ledgerCategoryOptions" placeholder="例如 餐饮、交通、工资" /></label>
+          <label>账户 / 钱包<input id="ledgerAccount" placeholder="例如现金、银行卡、支付宝、微信、其他" /></label>
+          <label>支付方式<input id="ledgerPaymentMethod" placeholder="例如现金、扫码、转账、刷卡" /></label>
+        </div>
+        <label>备注<textarea id="ledgerNote" placeholder="可留空"></textarea></label>
+        <div class="ledger-form-actions">
+          <button class="light" id="ledgerCancelEditBtn" type="button" hidden>取消编辑</button>
+          <button id="ledgerSubmitBtn" type="submit">记一笔</button>
+        </div>
+        <datalist id="ledgerCategoryOptions">
+          <option value="餐饮"></option><option value="交通"></option><option value="购物"></option><option value="住房"></option><option value="医疗"></option><option value="学习"></option><option value="娱乐"></option><option value="其他"></option>
+          <option value="工资"></option><option value="兼职"></option><option value="报销"></option><option value="退款"></option><option value="礼金"></option>
+        </datalist>
+      </form>
+      <section class="ledger-panel ledger-filter-bar">
+        <div class="ledger-filter-grid">
+          <label>查看<select id="ledgerViewMode"><option value="day">按日</option><option value="month">按月</option><option value="year">按年</option><option value="all">全部</option></select></label>
+          <label class="ledger-view-date-wrap">日期<input id="ledgerViewDate" type="date" /></label>
+          <label class="ledger-view-month-wrap" hidden>月份<input id="ledgerViewMonth" type="month" /></label>
+          <label class="ledger-view-year-wrap" hidden>年份<input id="ledgerViewYear" type="number" min="1900" max="2999" step="1" /></label>
+          <label>类型<select id="ledgerTypeFilter"><option value="all">全部类型</option><option value="expense">支出</option><option value="income">收入</option></select></label>
+          <label>分类<input id="ledgerCategoryFilter" list="ledgerCategoryOptions" placeholder="全部分类" /></label>
+          <button class="light" id="ledgerResetFilterBtn" type="button">重置筛选</button>
+        </div>
+      </section>
+      <section class="ledger-panel ledger-category-summary">
+        <div class="ledger-summary-columns">
+          <div><h3>支出分类汇总</h3><div id="ledgerExpenseCategorySummary"></div></div>
+          <div><h3>收入分类汇总</h3><div id="ledgerIncomeCategorySummary"></div></div>
+          <div><h3>账户 / 钱包汇总</h3><div id="ledgerAccountSummary"></div></div>
+        </div>
+      </section>
+      <section class="ledger-panel ledger-record-list">
+        <div class="ledger-section-head">
+          <div><h2>收支记录</h2><p id="ledgerListNote">按日期倒序排列。</p></div>
+        </div>
+        <div id="ledgerList"></div>
+      </section>
+      <section class="ledger-panel ledger-tools">
+        <strong>账本备份</strong>
+        <div class="ledger-actions">
+          <button class="light" id="ledgerExportJsonBtn" type="button">导出账本备份</button>
+          <button class="light" id="ledgerExportCsvBtn" type="button">导出 CSV</button>
+          <button id="ledgerImportJsonBtn" type="button">导入账本备份</button>
+          <input id="ledgerImportJsonInput" type="file" accept="application/json,.json" hidden />
+        </div>
+      </section>
+    </div>
+  </div>
   <div class="lock-backdrop" id="lockBackdrop"><div class="modal"><h2>月之暗面已锁定</h2><label>进入密码</label><input id="unlockPassword" type="password" autocomplete="current-password" placeholder="输入进入密码" /><div class="modal-actions"><button class="light" id="biometricUnlockBtn" type="button">指纹 / 面容</button><button id="unlockBtn" type="button">进入</button></div><div class="soft-warning">密码锁只保存在本应用内。生物识别由系统处理（Android 或浏览器），本应用不会保存指纹或面容数据。</div></div></div>
   <div class="disclaimer-backdrop" id="disclaimerBackdrop"><div class="disclaimer"><h2>使用前提示</h2><p>“月之暗面”是专为多意识体设计的本地记录工具，用于自我记录、内部沟通整理和日常回顾。</p><ul><li>它不提供诊断、治疗、危机干预或医疗建议。</li><li>如果你正在经历强烈痛苦、失控风险或伤害自己/他人的冲动，请优先联系现实中的可信任的人、专业支持或当地紧急援助。</li><li>记录内容和导入的图片保存在本应用内，请自行留意设备安全和备份。</li><li>Android 版不申请联网权限；网页/本地数据不会由本应用主动上传。</li></ul><div class="disclaimer-actions"><button id="enterBtn" disabled>请等待 3 秒</button></div></div></div>
   <div class="drawer-backdrop" id="drawerBackdrop"></div>
