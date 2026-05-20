@@ -198,6 +198,7 @@ LEDGER_SETTINGS_KEY = "moonLedger.settings.v1"
 
 - `fontSize`
 - `dark`
+- `lockKdf`
 - `lockHash`
 - `useBiometric`
 - `webauthnCredentialId`
@@ -208,6 +209,8 @@ LEDGER_SETTINGS_KEY = "moonLedger.settings.v1"
 - `privateRoomNoticeSeen`
 - `showArrivalOnEnter`
 - `terms`
+
+`lockKdf` 保存新设置密码的 PBKDF2-SHA256 派生信息：`alg`、`iterations`、`salt`、`hash`。`lockHash` 只作为旧版无 salt SHA-256 锁屏密码兼容字段；旧密码验证成功后会尝试迁移到 `lockKdf`。`useBiometric` 只能作为已有本地锁屏密码的解锁方式，不能单独构成锁屏凭据。锁屏只是本地轻量隐私门帘，不是本机数据加密；需要保护导出文件时应使用 encrypted-json。
 
 `showArrivalOnEnter` 控制进入记录界面时是否显示接续面板。`terms` 保存自定义术语，只影响界面文案，不修改历史内容或 JSON key。
 
@@ -278,6 +281,8 @@ importBackupFile(file)
 - 如果新版 JSON 同时包含 ID 和 DataURL，优先用 DataURL 恢复为新的 import 图片 ID，避免覆盖本机已有同名图片。
 - `externalizeImagesAfterJsonImport()` 完成后会按现有规则重算原本校验正常的消息 `integrity`；原备份中已经校验异常的消息不会被静默重算成正常。
 - JSON 导入失败不会覆盖当前 `data`，并会 best-effort 删除本次导入新增的图片。
+- 如果导入前存在 `imageData/avatarData/backgroundData`，导入成功后会清理 `imageMigrationDone` 等迁移标记，让下次启动有机会重新检查旧式图片字段。
+- 主记录导入会在最终保存前立即结算已过期的进行中投票，避免最多等待 60 秒定时器。
 - 如果旧版主记录备份中存在 `ledgerRecords`，主记录导入只提示，不会自动覆盖当前账本。
 
 P5-03 验收确认完整 JSON / encrypted-json 能恢复成员头像、房间背景和聊天图片；导出 hydrate 不改变运行时 data 或 IndexedDB 图片，导入 externalize 后主 data 不长期保留大体积 DataURL。
@@ -286,10 +291,11 @@ P5-03 验收确认完整 JSON / encrypted-json 能恢复成员头像、房间背
 
 ## 9. messageIntegrity 与 nextSeq
 
-`messageIntegrity(m)` 定义在 `js/integrity.js`。规则保持不变：
+`messageIntegrity(m)` 定义在 `js/integrity.js`。新生成的校验输入使用真实 U+001F 作为字段分隔符，同时兼容旧版本误写的字面字符串 `"\\u001f"`：
 
 - 没有 `imageId` 的旧格式消息，校验输入包含 `imageData`。
 - 有 `imageId` 的新格式消息，校验输入包含 `imageId` 和 `_imgVer = 2`。
+- `integrityOk(m)` 同时接受新 U+001F 算法和旧字面分隔符算法，避免旧备份 / 旧消息大规模误报。
 - 不应随意改变输入字段集合。
 - 如果未来必须改变规则，需要显式版本标记并通过迁移重算。
 
@@ -301,7 +307,7 @@ P5-03 验收确认完整 JSON / encrypted-json 能恢复成员头像、房间背
 - `resetNextSeqFromMessages()` 会从剩余 `messages` 重算 `data.nextSeq`。
 - 删除消息、清空聊天、清空数据或删除房间内消息后会重算。
 - 当 `messages` 为空时，`nextSeq` 回到 `1`，下一条消息校验码从 `0001` 开始。
-- 这些修复不改变 `messageIntegrity` 规则。
+- 这些修复不改变 `messageIntegrity` 输入字段集合；P6-01 仅修正分隔符实现，并保留旧分隔符兼容验证。
 
 合法重算 integrity 的场景：
 

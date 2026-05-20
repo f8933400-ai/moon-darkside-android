@@ -1,5 +1,19 @@
 # 发布说明
 
+## P6-01 锁屏 / integrity / 业务逻辑小坑修复
+
+P6-01 继续暂停 Android APK / macOS DMG / iOS 自签测试包试制，先收束代码审查中确认的中高优先级逻辑问题：
+
+- 新设置的进入密码锁改用带独立 salt 的 PBKDF2-SHA256；旧 `lockHash` 仍可解锁，并在成功解锁后尝试迁移到新 `lockKdf`。
+- 禁止“只开启生物识别但没有进入密码”的无效锁屏状态；旧偏好中发现该状态会自动纠正。
+- 锁屏文案明确说明它只是本地轻量隐私门帘，不是数据加密；备份文件保护仍应使用 encrypted-json。
+- `messageIntegrity` 新生成值改用真实 U+001F 字段分隔符，同时兼容旧版字面 `"\\u001f"` 分隔符生成的消息。
+- 编辑已有 fronting 记录时不再因为结束时间为空而误关其它正在进行的记录；新建进行中记录仍会关闭其它 open 记录。
+- 导入旧式 inline 图片备份成功后会清理图片迁移完成标记，给下次启动留下迁移兜底。
+- 主记录 JSON / encrypted-json 导入后会立即结算已过期的进行中投票，不再最多等待 60 秒定时器。
+
+本轮未处理 Service Worker stale-while-revalidate、`dataUrlToBlob` charset、urlCache、账本金额整数化、QR 库拆分、封面模式计时器和更广泛普通保存路径 rollback；这些进入 P6-02 或后续阶段。跨平台打包继续暂停。
+
 ## P6-00 封包前关键数据安全修复
 
 P6-00 暂停 Android APK / macOS DMG / iOS 自签测试包试制，优先修复封包前 P1 数据安全问题：

@@ -145,9 +145,10 @@
       const snapshot=cloneAppStateForRollback();
       data.frontingLogs=Array.isArray(data.frontingLogs)?data.frontingLogs:[];
       const editId=document.getElementById("frontingEditId")?.value||"";
+      const isEditing=!!editId;
       const stamp=now();
       let savedLog=null;
-      if(editId){
+      if(isEditing){
         savedLog=data.frontingLogs.find(f=>f.id===editId)||null;
         if(!savedLog){
           alert("没有找到要编辑的记录，可能已经被删除。");
@@ -161,7 +162,7 @@
         savedLog={id:makeId(),...payload,createdAt:stamp,updatedAt:stamp};
         data.frontingLogs.push(savedLog);
       }
-      if(savedLog.endAt===null)closeOtherOpenFrontingLogs(savedLog.id,savedLog.startAt||stamp);
+      if(!isEditing&&savedLog.endAt===null)closeOtherOpenFrontingLogs(savedLog.id,savedLog.startAt||stamp);
       try{
         if(!(await save()))throw new Error("save returned false");
       }catch(err){

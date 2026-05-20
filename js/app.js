@@ -529,17 +529,102 @@
       closeModal("clearModal");
       render();
     };
+    const LOCK_KDF_ALG="PBKDF2-SHA256";
+    const LOCK_KDF_ITERATIONS=250000;
+    const LOCK_PASSWORD_MIN_LENGTH=6;
     function b64uEnc(buf){return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
     function b64uDec(s){s=String(s).replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4)s+="="; const bin=atob(s); const buf=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i); return buf.buffer;}
     async function webauthnSupported(){if(!window.PublicKeyCredential||!navigator.credentials)return false; try{return !!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch{return false;}}
     async function webauthnRegister(){const challenge=crypto.getRandomValues(new Uint8Array(32)); const userId=crypto.getRandomValues(new Uint8Array(16)); const cred=await navigator.credentials.create({publicKey:{challenge,rp:{name:"月之暗面"},user:{id:userId,name:"moon-local-user",displayName:"本地用户"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"preferred"},timeout:60000,attestation:"none"}}); if(!cred)throw new Error("注册被取消"); return b64uEnc(cred.rawId);}
     async function webauthnAuthenticate(credentialIdB64u){const challenge=crypto.getRandomValues(new Uint8Array(32)); const result=await navigator.credentials.get({publicKey:{challenge,allowCredentials:[{type:"public-key",id:b64uDec(credentialIdB64u)}],userVerification:"required",timeout:60000}}); if(!result)throw new Error("认证未完成"); return true;}
     async function sha256(text){if(!crypto.subtle)return "local-"+checksum("moon-lock:"+text); const bytes=new TextEncoder().encode(text); const digest=await crypto.subtle.digest("SHA-256",bytes); return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");}
-    async function startLock(){const locked=!!prefs.lockHash; document.getElementById("lockBackdrop").style.display=locked?"flex":"none"; let bio=false; if(prefs.useBiometric){if(window.MoonBridge?.authenticate)bio=true; else if(prefs.webauthnCredentialId&&await webauthnSupported())bio=true;} document.getElementById("biometricUnlockBtn").style.display=bio?"inline-block":"none"; if(locked)setTimeout(()=>document.getElementById("unlockPassword").focus(),80);}
-    async function unlockWithPassword(){const input=document.getElementById("unlockPassword"); if(!prefs.lockHash){document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady(); return;} const hash=await sha256(input.value); if(hash===prefs.lockHash){input.value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();} else {alert("密码不正确。"); input.select();}}
-    async function saveLockSettings(){const password=document.getElementById("newLockPassword").value; const wantBio=document.getElementById("useBiometric").checked; if(password){if(password.length<4){alert("密码至少 4 位。");return;} prefs.lockHash=await sha256(password);} if(wantBio&&!window.MoonBridge?.authenticate){if(!await webauthnSupported()){alert("当前浏览器不支持平台生物识别。\n要求：HTTPS / localhost，且系统已设置指纹或面容。");document.getElementById("useBiometric").checked=false; prefs.useBiometric=false; await savePrefs(); return;} if(!prefs.webauthnCredentialId){try{prefs.webauthnCredentialId=await webauthnRegister();}catch(err){const name=err?.name||""; const msg=name==="NotAllowedError"?"已取消或超时。":(err?.message||name||"未知错误"); alert("生物识别注册失败："+msg); document.getElementById("useBiometric").checked=false; prefs.useBiometric=false; await savePrefs(); return;}}} if(!wantBio)prefs.webauthnCredentialId=""; prefs.useBiometric=wantBio; if(await savePrefs()){closeModal("lockSettingsModal"); alert(prefs.lockHash?"密码锁设置已保存。":"设置已保存。");}}
-    async function disableLock(){if(!confirm("确定关闭进入密码锁吗？"))return; prefs.lockHash=""; prefs.useBiometric=false; prefs.webauthnCredentialId=""; if(await savePrefs()){closeModal("lockSettingsModal"); document.getElementById("lockBackdrop").style.display="none";}}
-    async function requestBiometricUnlock(){if(!prefs.useBiometric){alert("请先在密码设置中允许使用系统指纹 / 面容解锁。");return;} if(window.MoonBridge?.authenticate){window.MoonBridge.authenticate();return;} if(prefs.webauthnCredentialId){if(!await webauthnSupported()){alert("当前浏览器不支持平台生物识别。");return;} try{await webauthnAuthenticate(prefs.webauthnCredentialId); document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();}catch(err){const name=err?.name||""; if(name==="NotAllowedError")alert("已取消或未通过验证。"); else if(name==="InvalidStateError")alert("找不到已注册的凭据，请用密码登入后重新启用。"); else alert("生物识别失败："+(err?.message||name||"未知错误"));} return;} alert("当前环境不支持系统指纹 / 面容解锁。");}
+    function lockKdfIsUsable(value){return !!(value&&value.alg===LOCK_KDF_ALG&&value.salt&&value.hash);}
+    function hasLockCredential(){return lockKdfIsUsable(prefs.lockKdf)||!!prefs.lockHash;}
+    function lockCrypto(){const c=window.crypto||globalThis.crypto; if(!c?.subtle||!c?.getRandomValues)throw new Error("crypto_subtle_unavailable"); return c;}
+    function bytesToBase64(bytes){let binary=""; const view=new Uint8Array(bytes); for(let i=0;i<view.length;i++)binary+=String.fromCharCode(view[i]); return btoa(binary);}
+    function base64ToBytes(value){const binary=atob(String(value||"")); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i); return bytes;}
+    function randomSaltBase64(length=16){const bytes=new Uint8Array(length); lockCrypto().getRandomValues(bytes); return bytesToBase64(bytes);}
+    function timingSafeEqualString(a,b){const left=String(a||""); const right=String(b||""); const max=Math.max(left.length,right.length); let diff=left.length^right.length; for(let i=0;i<max;i++)diff|=(left.charCodeAt(i)||0)^(right.charCodeAt(i)||0); return diff===0;}
+    async function pbkdf2HashPassword(password,saltBase64,iterations){const c=lockCrypto(); const key=await c.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]); const bits=await c.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:base64ToBytes(saltBase64),iterations:Number(iterations)||LOCK_KDF_ITERATIONS},key,256); return bytesToBase64(new Uint8Array(bits));}
+    async function makeLockKdf(password){const salt=randomSaltBase64(16); return {alg:LOCK_KDF_ALG,iterations:LOCK_KDF_ITERATIONS,salt,hash:await pbkdf2HashPassword(password,salt,LOCK_KDF_ITERATIONS)};}
+    async function verifyLockPassword(password){
+      if(lockKdfIsUsable(prefs.lockKdf)){
+        const hash=await pbkdf2HashPassword(password,prefs.lockKdf.salt,prefs.lockKdf.iterations);
+        return {ok:timingSafeEqualString(hash,prefs.lockKdf.hash),legacy:false};
+      }
+      if(prefs.lockHash){
+        const hash=await sha256(password);
+        return {ok:timingSafeEqualString(hash,prefs.lockHash),legacy:true};
+      }
+      return {ok:false,legacy:false};
+    }
+    async function migrateLegacyLockHashIfNeeded(password){
+      if(!prefs.lockHash||lockKdfIsUsable(prefs.lockKdf))return;
+      const previousHash=prefs.lockHash;
+      const previousKdf=prefs.lockKdf;
+      try{
+        prefs.lockKdf=await makeLockKdf(password);
+        prefs.lockHash="";
+        if(!(await savePrefs()))throw new Error("savePrefs returned false");
+      }catch(err){
+        prefs.lockHash=previousHash;
+        prefs.lockKdf=previousKdf;
+        console.warn("legacy lock hash migration failed",err);
+      }
+    }
+    function clearLockCredentials(){prefs.lockHash=""; prefs.lockKdf=null; prefs.useBiometric=false; prefs.webauthnCredentialId="";}
+    async function startLock(){const locked=hasLockCredential(); if(!locked&&prefs.useBiometric){prefs.useBiometric=false; prefs.webauthnCredentialId=""; try{await savePrefs();}catch(err){console.warn("failed to clear biometric without lock password",err);}} document.getElementById("lockBackdrop").style.display=locked?"flex":"none"; let bio=false; if(locked&&prefs.useBiometric){if(window.MoonBridge?.authenticate)bio=true; else if(prefs.webauthnCredentialId&&await webauthnSupported())bio=true;} document.getElementById("biometricUnlockBtn").style.display=bio?"inline-block":"none"; if(locked)setTimeout(()=>document.getElementById("unlockPassword").focus(),80);}
+    async function unlockWithPassword(){const input=document.getElementById("unlockPassword"); if(!hasLockCredential()){document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady(); return;} let result={ok:false,legacy:false}; try{result=await verifyLockPassword(input.value);}catch(err){console.error("lock password verification failed",err);} if(result.ok){if(result.legacy)await migrateLegacyLockHashIfNeeded(input.value); input.value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();} else {alert("密码不正确。"); input.select();}}
+    async function saveLockSettings(){
+      const previousPrefs=JSON.parse(JSON.stringify(prefs||{}));
+      const restoreLockPrefs=()=>{prefs=previousPrefs; document.getElementById("useBiometric").checked=!!prefs.useBiometric;};
+      const saveLockPrefs=async()=>{if(await savePrefs())return true; restoreLockPrefs(); alert("保存失败，已恢复原状态。"); return false;};
+      const password=document.getElementById("newLockPassword").value;
+      const wantBio=document.getElementById("useBiometric").checked;
+      if(password){
+        if(password.length<LOCK_PASSWORD_MIN_LENGTH){alert(`密码至少 ${LOCK_PASSWORD_MIN_LENGTH} 位，建议使用更长密码。`);return;}
+        try{prefs.lockKdf=await makeLockKdf(password); prefs.lockHash="";}
+        catch(err){console.error("lock password kdf failed",err); alert("当前环境不支持安全密码派生，暂时无法设置新的进入密码。"); return;}
+      }
+      if(wantBio&&!hasLockCredential()){
+        alert("请先设置锁屏密码，再启用生物识别。");
+        document.getElementById("useBiometric").checked=false;
+        prefs.useBiometric=false;
+        prefs.webauthnCredentialId="";
+        await saveLockPrefs();
+        return;
+      }
+      if(wantBio&&!window.MoonBridge?.authenticate){
+        if(!await webauthnSupported()){
+          alert("当前浏览器不支持平台生物识别。\n要求：HTTPS / localhost，且系统已设置指纹或面容。");
+          document.getElementById("useBiometric").checked=false;
+          prefs.useBiometric=false;
+          if(await saveLockPrefs())document.getElementById("newLockPassword").value="";
+          return;
+        }
+        if(!prefs.webauthnCredentialId){
+          try{prefs.webauthnCredentialId=await webauthnRegister();}
+          catch(err){
+            const name=err?.name||"";
+            const msg=name==="NotAllowedError"?"已取消或超时。":(err?.message||name||"未知错误");
+            alert("生物识别注册失败："+msg);
+            document.getElementById("useBiometric").checked=false;
+            prefs.useBiometric=false;
+            if(await saveLockPrefs())document.getElementById("newLockPassword").value="";
+            return;
+          }
+        }
+      }
+      if(!wantBio)prefs.webauthnCredentialId="";
+      prefs.useBiometric=wantBio;
+      if(await saveLockPrefs()){
+        document.getElementById("newLockPassword").value="";
+        closeModal("lockSettingsModal");
+        alert(hasLockCredential()?"密码锁设置已保存。":"设置已保存。");
+      }
+    }
+    async function disableLock(){if(!confirm("确定关闭进入密码锁吗？"))return; clearLockCredentials(); if(await savePrefs()){closeModal("lockSettingsModal"); document.getElementById("lockBackdrop").style.display="none";}}
+    async function requestBiometricUnlock(){if(!prefs.useBiometric){alert("请先在密码设置中允许使用系统指纹 / 面容解锁。");return;} if(!hasLockCredential()){clearLockCredentials(); await savePrefs(); alert("请先设置锁屏密码，再启用生物识别。");return;} if(window.MoonBridge?.authenticate){window.MoonBridge.authenticate();return;} if(prefs.webauthnCredentialId){if(!await webauthnSupported()){alert("当前浏览器不支持平台生物识别。");return;} try{await webauthnAuthenticate(prefs.webauthnCredentialId); document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();}catch(err){const name=err?.name||""; if(name==="NotAllowedError")alert("已取消或未通过验证。"); else if(name==="InvalidStateError")alert("找不到已注册的凭据，请用密码登入后重新启用。"); else alert("生物识别失败："+(err?.message||name||"未知错误"));} return;} alert("当前环境不支持系统指纹 / 面容解锁。");}
     window.onMoonAuthResult=function(ok,message){if(ok){document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();} else if(message){alert(message);}};
     let disclaimerTimer=null;
     function startDisclaimer(){const btn=document.getElementById("enterBtn"); if(disclaimerTimer){clearInterval(disclaimerTimer);disclaimerTimer=null;} let left=3; btn.disabled=true; btn.textContent=`请等待 ${left} 秒`; disclaimerTimer=setInterval(()=>{left-=1; if(left>0){btn.textContent=`请等待 ${left} 秒`; return;} clearInterval(disclaimerTimer); disclaimerTimer=null; btn.disabled=false; btn.textContent="我已了解，进入";},1000); btn.onclick=()=>{if(btn.disabled)return; document.getElementById("disclaimerBackdrop").style.display="none"; promptArrivalIfReady();};}

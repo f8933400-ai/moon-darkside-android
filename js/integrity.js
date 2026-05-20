@@ -9,14 +9,18 @@
     function calculateNextSeqFromMessages(messages){const rows=Array.isArray(messages)?messages:[]; const maxSeq=rows.reduce((max,m)=>{const seq=Number(m&&m.seq)||0; return seq>max?seq:max;},0); return maxSeq+1;}
     function resetNextSeqFromMessages(){if(typeof data==="undefined"||!data)return 1; data.nextSeq=calculateNextSeqFromMessages(data.messages); return data.nextSeq;}
     function nextMessageSeq(){const fallback=calculateNextSeqFromMessages(data.messages); const seq=Math.max(Number(data.nextSeq)||0,fallback); data.nextSeq=seq+1; return seq;}
-    function messageIntegrity(m){
-      if(!m.imageId)return checksum([m.seq,m.id,m.roomId,m.speakerId,m.speakerName,m.kind,m.text,m.imageName,m.imageType,m.imageData,m.createdAt].map(v=>v||"").join("\\u001f"));
+    const INTEGRITY_SEPARATOR="\u001f";
+    const LEGACY_INTEGRITY_SEPARATOR="\\u001f";
+    function calcMessageIntegrityWithSeparator(m,separator){
+      if(!m.imageId)return checksum([m.seq,m.id,m.roomId,m.speakerId,m.speakerName,m.kind,m.text,m.imageName,m.imageType,m.imageData,m.createdAt].map(v=>v||"").join(separator));
       // imageMigration v1 会因为 imageData -> imageId 外置迁移而合法重算所有 message integrity。
       const _imgVer=2;
-      return checksum([m.seq,m.id,m.roomId,m.speakerId,m.speakerName,m.kind,m.text,m.imageName,m.imageType,m.imageId,_imgVer,m.createdAt].map(v=>v||"").join("\\u001f"));
+      return checksum([m.seq,m.id,m.roomId,m.speakerId,m.speakerName,m.kind,m.text,m.imageName,m.imageType,m.imageId,_imgVer,m.createdAt].map(v=>v||"").join(separator));
     }
+    function messageIntegrity(m){return calcMessageIntegrityWithSeparator(m,INTEGRITY_SEPARATOR);}
+    function legacyMessageIntegrity(m){return calcMessageIntegrityWithSeparator(m,LEGACY_INTEGRITY_SEPARATOR);}
     function ensureMessage(m){m.id=m.id||makeId(); m.seq=Number(m.seq)||nextMessageSeq(); m.createdAt=m.createdAt||now(); m.integrity=messageIntegrity(m); return m;}
-    function integrityOk(m){return m.integrity===messageIntegrity(m);}
+    function integrityOk(m){return m.integrity===messageIntegrity(m)||m.integrity===legacyMessageIntegrity(m);}
     function seqCode(m){return String(Number(m.seq)||0).padStart(4,"0");}
     window.calculateNextSeqFromMessages=calculateNextSeqFromMessages;
     window.resetNextSeqFromMessages=resetNextSeqFromMessages;

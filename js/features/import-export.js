@@ -105,6 +105,22 @@
       if(input)input.value="";
       if(btn)btn.textContent="导入 JSON";
     }
+    function hasInlineImageData(appData){
+      if(!appData||typeof appData!=="object")return false;
+      if((appData.messages||[]).some(m=>!!m?.imageData))return true;
+      if((appData.members||[]).some(m=>!!m?.avatarData))return true;
+      if((appData.rooms||[]).some(r=>!!r?.backgroundData))return true;
+      return false;
+    }
+    function resetImageMigrationDoneAfterInlineImport(){
+      try{
+        localStorage.removeItem("imageMigrationDone");
+        localStorage.removeItem("imageMigrationAt");
+        localStorage.removeItem("imageMigrationVersion");
+      }catch(err){
+        console.warn("failed to reset image migration flag after import",err);
+      }
+    }
     function showEncryptedImportControls(envelope){
       pendingEncryptedBackupEnvelope=envelope;
       const box=document.getElementById("encryptedImportBox");
@@ -523,6 +539,7 @@
     }
     async function importParsedBackup(parsed){
       const incoming=await storage.importBackup(parsed);
+      const hadInlineImagesBeforeImport=hasInlineImageData(incoming);
       const hasLegacyLedger=Array.isArray(parsed?.ledgerRecords);
       const badMessages=incoming.messages.filter(m=>!integrityOk(m));
       const bad=badMessages.length;
@@ -544,6 +561,16 @@
       }
       data=incoming;
       currentRoomId=data.rooms[0]?.id||"main";
+      let importDataBeforePollClose=null;
+      try{
+        importDataBeforePollClose=JSON.stringify(data);
+        if(typeof closeDuePolls==="function")await closeDuePolls({saveChanges:false});
+      }catch(err){
+        console.warn("importParsedBackup: closeDuePolls failed",err);
+        if(importDataBeforePollClose){
+          try{data=JSON.parse(importDataBeforePollClose);}catch(parseErr){console.warn("importParsedBackup: failed to restore data after closeDuePolls failure",parseErr);}
+        }
+      }
       if(!(await save())){
         await cleanupImagesBestEffort(createdImageIds);
         restoreAppStateFromRollback(snapshot);
@@ -551,6 +578,7 @@
         alert("导入失败，已尽量恢复原数据和图片状态。");
         return false;
       }
+      if(hadInlineImagesBeforeImport)resetImageMigrationDoneAfterInlineImport();
       closeModal("exportModal");
       resetEncryptedImportControls();
       render();

@@ -216,7 +216,8 @@
       }
       return false;
     }
-    async function closeDuePolls(){
+    async function closeDuePolls(options={}){
+      const shouldSave=options.saveChanges!==false;
       let changed=false;
       const t=Date.now();
       (data.polls||[]).forEach(p=>{
@@ -224,7 +225,7 @@
           if(closePollRecord(p,false))changed=true;
         }
       });
-      if(changed)await save();
+      if(changed&&shouldSave)await save();
       return changed;
     }
     function pollOptionRowsHtml(poll,voted,canVote){
