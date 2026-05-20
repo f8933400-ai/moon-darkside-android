@@ -1,5 +1,19 @@
 # 发布说明
 
+## P6-08 v0.4.1 package-test 封版
+
+P6-08 完成 `v0.4.1-package-test` 封版记录，并准备外部 package-test 归档包：
+
+- Android debug APK 重新构建通过，APK 保持仓库外输出；当前没有设备 / AVD 运行验收，因此不声称 Android 运行态通过。
+- macOS `.app` / DMG 重新构建通过，DMG verify 通过；`.app` 可启动进程，但完整 GUI 点击验收仍未完成。
+- iOS WKWebView 工程 simulator build 通过；当前没有 Team ID、有效 codesigning identity、可用 simulator device / runtime 或连接设备，因此未生成 archive 或 IPA。
+- package-test 定位为本机 / 小范围测试基线，不是正式公开发布版，不是三端运行全通过版。
+- 安装包和外部归档不预置用户数据；用户仍需自行使用主 JSON、encrypted-json 和账本 JSON 备份。
+- 本轮不做 Android release signing、macOS Developer ID 签名 / notarization、iOS App Store / TestFlight / 正式 Ad Hoc 分发。
+- 下一阶段进入 P7 设备运行验收，重点补 Android 设备 / AVD、macOS GUI、iOS simulator / 真机签名和三端文件导入导出差异。
+
+本轮没有提交 APK / DMG / IPA / `.app` / archive / build 输出，没有新增 Web app 运行时联网请求、npm、CDN 或 `type="module"`。
+
 ## P6-07 三端安装包功能验收
 
 P6-07 完成 Android / macOS / iOS 三端测试壳的综合验收记录：
