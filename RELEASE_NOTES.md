@@ -1,5 +1,18 @@
 # 发布说明
 
+## P6-05 macOS WKWebView DMG 测试包
+
+P6-05 新增 macOS WKWebView DMG 测试壳，并生成本地测试 `.app` / DMG：
+
+- 新增 `platforms/macos/` 轻量 Swift + AppKit + WebKit 工程，不创建复杂 Xcode project，也不引入 Electron、npm、CDN 或远程依赖。
+- 构建脚本在打包时复制当前静态 app shell 到 `.app/Contents/Resources/www/`，不重复提交 Web app 副本，并排除 `.git`、`node_modules`、真实备份、包产物和临时文件。
+- WKWebView 使用 `loadFileURL(..., allowingReadAccessTo:)` 加载本地 app shell，外部导航默认拦截；wrapper 不依赖 Service Worker。
+- 生成 `.app` 和 DMG 到仓库外，不提交 `.app`、DMG 或 build 输出。
+- 本轮只做 ad-hoc 签名，不做 Developer ID 签名，不做 notarization；外部机器打开可能遇到 Gatekeeper 提示。
+- 本轮没有修改 Web app 核心业务语义，没有改变主记录、encrypted-json、账本、图片、锁屏或 integrity 规则。
+
+当前已确认 `.app` 和 DMG 中 `.app` 可以启动进程，DMG 可以挂载和校验；完整 GUI 交互验收仍需后续覆盖 localStorage、IndexedDB、文件导入导出、Blob 下载、图片、账本、锁屏和 QR。下一阶段进入 iOS 自签测试壳。
+
 ## P6-04 Android WebView APK 测试包
 
 P6-04 新增 Android WebView APK 测试壳，并生成 debug APK 测试包：

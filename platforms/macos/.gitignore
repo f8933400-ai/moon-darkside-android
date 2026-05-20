@@ -1,0 +1,15 @@
+# macOS package-test wrapper outputs
+build/
+dist/
+DerivedData/
+*.app
+*.dmg
+*.xcarchive
+*.xcuserdata
+*.xcuserstate
+**/*.app
+**/*.dmg
+**/*.xcarchive
+**/*.xcuserdata
+**/*.xcuserstate
+.DS_Store

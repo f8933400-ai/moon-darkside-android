@@ -27,3 +27,13 @@ platforms/android/*.apk
 platforms/android/*.aab
 platforms/android/**/*.apk
 platforms/android/**/*.aab
+
+# macOS package-test wrapper outputs
+platforms/macos/build/
+platforms/macos/dist/
+platforms/macos/DerivedData/
+platforms/macos/**/*.app
+platforms/macos/**/*.dmg
+platforms/macos/**/*.xcarchive
+platforms/macos/**/*.xcuserdata
+platforms/macos/**/*.xcuserstate
