@@ -19,6 +19,17 @@ P3-04 增加了可选的加密完整 JSON 备份：
 - 普通 JSON 备份仍可用。导入加密备份成功后，解密出的普通完整 JSON 会走现有导入流程，图片仍会 externalize 回 IndexedDB。
 - 仍建议至少保留一份安全保存的备份，并谨慎分享任何完整备份。
 
+## P3-05 PWA / 本地安装基础支持
+
+P3-05 增加基础 PWA 支持：
+
+- 新增 `manifest.webmanifest`，声明应用名称、独立窗口显示、主题色和现有 `app_icon.png` 图标。
+- 新增 `sw.js`，只缓存静态 app shell：入口 HTML、样式、manifest、图标和本地 `js/` 脚本。
+- 新增普通脚本 `js/sw-register.js`，仅在 `https:` 或本机 `http://localhost` / `127.0.0.1` / `[::1]` 下注册 Service Worker；`file://` 下静默跳过。
+- PWA 安装是可选能力，不提供云同步，不替代完整 JSON 备份或加密备份。
+- 用户数据仍保存在当前浏览器的 `localStorage` + IndexedDB 中。Service Worker 不缓存用户导出的 JSON / `.moonenc.json` 文件、图片 Blob、IndexedDB 内容或 `localStorage` 内容。
+- 更新 app 文件后，浏览器可能需要刷新页面或清理此站点缓存 / Service Worker 才能看到最新静态文件。
+
 ## P0-P2 已完成功能
 
 P0 阶段：

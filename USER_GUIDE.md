@@ -10,6 +10,14 @@
 
 账本记录独立保存在本机，完整 JSON 备份会包含 `ledgerRecords`。
 
+## PWA 安装
+
+如果通过本机 `localhost` / `127.0.0.1` HTTP，或可信的 HTTPS 本地 / 私有静态服务打开，浏览器可能会提供“安装应用”或“添加到主屏幕”。这是可选功能，只是让应用像本机应用一样启动。
+
+PWA 的 Service Worker 只缓存应用静态文件，不缓存导出的 JSON / `.moonenc.json` 备份，不缓存图片 Blob，也不会上传用户数据。聊天、成员、账本、设置等数据仍保存在当前浏览器的 `localStorage` 和 IndexedDB 中。
+
+PWA 不等于云同步，也不替代完整 JSON 备份或加密备份。更新 app 文件后，如果界面还停留在旧版本，可以刷新页面，或清理此站点缓存 / Service Worker 后再打开。直接用 `file://` 打开时，Service Worker 不可用；需要 PWA 离线壳缓存时，请使用本地 HTTP。
+
 ## 成员、群组、私聊
 
 侧边栏可以切换：

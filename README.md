@@ -29,6 +29,16 @@ http://127.0.0.1:8080/index.html
 
 这只是本机服务，不会把数据上传到外部。
 
+## PWA 本地安装（可选）
+
+在本机 `localhost` / `127.0.0.1` HTTP，或可信的 HTTPS 本地 / 私有静态服务下打开时，浏览器可以把《月之暗面》作为 PWA 安装到桌面或主屏幕。PWA 安装只是更方便地打开应用，不会启用云同步、账号、遥测或远程 API。
+
+Service Worker 只缓存静态应用文件，例如 `index.html`、`styles.css`、`manifest.webmanifest`、图标和 `js/` 脚本。用户数据仍保存在当前浏览器的 `localStorage` 和 IndexedDB 中；导出的 `.json` / `.moonenc.json` 备份、图片 Blob、IndexedDB 内容和本机存储内容不会被 Service Worker 打包或上传。
+
+PWA 不替代完整 JSON 备份或加密备份。更新 app 文件后，浏览器可能仍使用旧的静态缓存；如果没有看到最新版本，可以刷新页面，或在浏览器里清理此站点的缓存 / Service Worker 后再打开。
+
+直接用 `file://` 打开时，浏览器不会注册 Service Worker，因此 PWA 离线安装缓存不可用。需要 PWA 能力时，请使用本机 HTTP，或部署到自己信任的 HTTPS 本地 / 私有静态服务。
+
 ## 数据保存位置
 
 主数据保存在 `localStorage`，图片保存在 IndexedDB。

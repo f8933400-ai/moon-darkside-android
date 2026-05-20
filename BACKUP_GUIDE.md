@@ -16,6 +16,14 @@
 
 完整 JSON 备份用于恢复本机数据。它不是脱敏报告，也不是适合分享的公开文件。
 
+## PWA 与备份的边界
+
+PWA 安装是可选的，只负责让应用更方便地启动，并通过 Service Worker 缓存静态应用文件。它不是云同步，也不会把用户数据上传到任何地方。
+
+Service Worker 不缓存完整 JSON 备份、`.moonenc.json` 加密备份、图片 Blob、IndexedDB 内容或 `localStorage` 内容。当前数据仍保存在当前浏览器的 `localStorage` + IndexedDB 中；一旦清理站点数据、更换浏览器或更换设备，仍需要依靠完整 JSON 备份或加密备份恢复。
+
+因此，PWA 不替代备份流程。更新 app 文件后，静态缓存可能暂时保留旧文件；如果看到旧界面，可以刷新页面，或清理此站点缓存 / Service Worker 后重新打开。直接用 `file://` 打开时，Service Worker 不可用；需要 PWA 缓存能力时，请使用本机 HTTP 或可信的 HTTPS 本地 / 私有静态服务。
+
 ## 可选加密完整 JSON 备份
 
 如果需要保护导出的备份文件，可以在“文件格式”里选择“加密完整 JSON 备份”。应用会先生成与普通完整 JSON 备份等价的备份对象，包括 hydrate 后的图片 DataURL，再用密码加密并保存为 `.moonenc.json` 文件。
