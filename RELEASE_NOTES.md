@@ -1,5 +1,18 @@
 # 发布说明
 
+## P6-07 三端安装包功能验收
+
+P6-07 完成 Android / macOS / iOS 三端测试壳的综合验收记录：
+
+- 重新构建 Android debug APK、macOS `.app` / DMG、iOS simulator app，三端构建均通过。
+- 重新检查 Android APK、macOS `.app` / DMG 和 iOS simulator app 内容边界，未发现 `.git`、`node_modules`、真实备份、用户数据或敏感样本进入测试产物。
+- Android 当前没有连接设备或 AVD，因此未完成 APK 安装、WebView 运行、localStorage、IndexedDB、图片、备份、账本、锁屏和 QR 的运行态验收。
+- macOS `.app` 和 DMG 中 `.app` 能启动进程，DMG 可挂载和校验；完整 GUI 点击验收、Blob 下载、中文文件名和文件选择仍需后续人工验证。
+- iOS 当前没有 Team ID、有效 codesigning identity、可用 simulator device / runtime 或连接设备；simulator build 通过，但未运行，未生成 archive 或 IPA。
+- 三端 WebView 下载、文件选择、中文文件名、分享 / 保存路径和 Service Worker 行为差异已记录为 package-test 已知限制。
+
+本轮没有新增正式发布流程，没有提交 APK / DMG / IPA / `.app` / archive / build 输出，没有新增 Web app 运行时联网请求、npm、CDN 或 `type="module"`。下一阶段进入 P6-08 `v0.4.1 package-test` 封版。
+
 ## P6-06 iOS WKWebView 自签测试壳 / IPA 试制
 
 P6-06 新增 iOS WKWebView 自签测试壳工程：
