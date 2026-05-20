@@ -118,6 +118,18 @@ P5-02 根据 P5-01 审计结论完成最小必要修复：
 - 清空群组但不清空聊天记录时增加额外确认，明确会删除被清空群组中的聊天记录。
 - 本轮没有新增依赖、联网请求、构建步骤或 `type="module"`，没有修改账本隔离语义。
 
+## P5-03 图片备份 / 恢复验收
+
+P5-03 完成图片备份、恢复、hydrate 和 externalize 链路验收：
+
+- 新增 `P5-03_IMAGE_BACKUP_RESTORE_ACCEPTANCE.md`，记录成员头像、房间背景、聊天图片、完整 JSON、encrypted-json、局部 JSON、`imageHealth` 和 P5-02 回滚修复的验收矩阵。
+- 确认完整 JSON 导出会在导出副本中 hydrate `imageData/avatarData/backgroundData`，且不改变运行时主 data 或 IndexedDB 图片。
+- 确认完整 JSON / encrypted-json 导入后，图片会 externalize 回 IndexedDB，主 data 恢复为 `imageId/avatarId/backgroundId` 引用。
+- 确认 encrypted-json 固定完整范围，并可恢复成员头像、房间背景和聊天图片。
+- 确认普通 JSON current / room 的图片范围跟随现有局部导出语义；局部 JSON 仍不是完整备份或脱敏分享文件。
+- 确认 `imageHealth` 能发现缺失引用、孤儿图片，并能从完整 JSON 备份修复缺失图片。
+- 本轮未发现阻断 bug，没有业务代码改动，没有新增依赖、联网请求、构建步骤或 `type="module"`。
+
 ## P0-P2 已完成功能
 
 P0 阶段：

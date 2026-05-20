@@ -261,6 +261,8 @@ importBackupFile(file)
 - JSON 导入失败不会覆盖当前 `data`。
 - 如果旧版主记录备份中存在 `ledgerRecords`，主记录导入只提示，不会自动覆盖当前账本。
 
+P5-03 验收确认完整 JSON / encrypted-json 能恢复成员头像、房间背景和聊天图片；导出 hydrate 不改变运行时 data 或 IndexedDB 图片，导入 externalize 后主 data 不长期保留大体积 DataURL。
+
 复盘报告和时间线只读取主数据摘要，只标记“含图片”，不读取 IndexedDB Blob，也不导出图片内容或 DataURL。
 
 ## 9. messageIntegrity 与 nextSeq
@@ -369,6 +371,8 @@ P0-P2 当前模块包括：
 - `repairMissingImagesFromBackupFile(file, options)`
 
 这些工具不会自动运行。备份健康检查 UI 只调用现有 imageHealth API，不直接改主 `data`；清理和修复需要用户确认。
+
+P5-03 验收确认 imageHealth 能发现缺失图片引用、孤儿图片，并可从完整 JSON 备份修复缺失图片；报告只包含引用 id、类型、数量、文件名和大小等元信息，不包含图片 Blob 或 DataURL。
 
 ## 14. 不变约束（维护规则）
 
