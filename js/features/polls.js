@@ -26,6 +26,7 @@
     function pollComments(poll){return pollPlainObject(poll?.comments)?poll.comments:{};}
     function pollDeadlineText(value){return value?new Date(value).toLocaleString():"未设置";}
     function pollDateTimeText(value,emptyText="可留空"){const d=new Date(value||""); return Number.isNaN(d.getTime())?emptyText:d.toLocaleString();}
+    function pollToLocalDateTimeInput(date){const d=date instanceof Date?date:new Date(date||""); if(Number.isNaN(d.getTime()))return ""; const local=new Date(d.getTime()-d.getTimezoneOffset()*60000); return local.toISOString().slice(0,16);}
     function pollStatusText(status){return POLL_STATUS_LABELS[String(status||"open")]||status||"未记录";}
     function pollVoteModeText(voteMode){return POLL_VOTE_MODE_LABELS[String(voteMode||"simple")]||"简单多数";}
     function getPollById(pollOrId){if(pollPlainObject(pollOrId))return pollOrId; return (data.polls||[]).find(x=>x&&x.id===pollOrId)||null;}
@@ -117,7 +118,7 @@
       const deadline=document.getElementById("pollDeadline");
       if(options&&!options.value.trim())options.value=POLL_DEFAULT_OPTIONS.join("\n");
       if(voteMode&&!["simple","consensus"].includes(voteMode.value))voteMode.value="simple";
-      if(deadline&&!deadline.value){const d=new Date(Date.now()+60*60*1000); d.setSeconds(0,0); deadline.value=d.toISOString().slice(0,16);}
+      if(deadline&&!deadline.value){const d=new Date(Date.now()+60*60*1000); d.setSeconds(0,0); deadline.value=pollToLocalDateTimeInput(d);}
     }
     function resetPollForm(){
       const setValue=(id,value)=>{const el=document.getElementById(id); if(el)el.value=value;};
