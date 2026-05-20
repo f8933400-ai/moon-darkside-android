@@ -31,6 +31,15 @@
         return {key,exists:value.length>0,chars:value.length,bytes:byteSizeOfString(value)};
       }
 
+      function estimateLedgerRecordCount(){
+        try{
+          const parsed=JSON.parse(localStorage.getItem(LEDGER_KEY)||"[]");
+          return Array.isArray(parsed)?parsed.length:0;
+        }catch{
+          return 0;
+        }
+      }
+
       function formatBytes(bytes){
         const n=Number(bytes);
         if(!Number.isFinite(n)||n<0)return "未知";
@@ -106,6 +115,7 @@
           main,
           prefs:prefsEntry,
           ledger,
+          ledgerRecordCount:estimateLedgerRecordCount(),
           imageCount:imageRecords.length,
           imageBytes,
           imageSizeKnown:imageRecords.length===0||imageSizes.length>0,
@@ -143,6 +153,7 @@
             renderStat("主数据大小",formatBytes(stats.main.bytes),`${stats.main.chars} 字符，KEY`),
             renderStat("偏好大小",formatBytes(stats.prefs.bytes),`${stats.prefs.chars} 字符，PREF_KEY`),
             renderStat("账本大小",formatBytes(stats.ledger.bytes),`${stats.ledger.chars} 字符，LEDGER_KEY`),
+            renderStat("账本记录数",formatCount(stats.ledgerRecordCount),"只统计数量"),
             renderStat("IndexedDB 图片数量",formatCount(stats.imageCount),stats.imageError||"moon-images / images"),
             renderStat("IndexedDB 图片总大小",stats.imageSizeKnown?formatBytes(stats.imageBytes):"未知","来自 listImages() 摘要"),
             renderStat("消息数",formatCount(stats.counts.messages),""),
@@ -168,7 +179,7 @@
         if(adviceBox){
           adviceBox.innerHTML=[
             `<p>${escapeHtml(getStorageRiskAdvice(stats.risk))}</p>`,
-            "<p>本面板只做本地估算，不会上传任何数据，也不会修改任何数据。图片已外置到 IndexedDB，但主数据仍可能增长。</p>"
+            "<p>本面板只做本地估算，不会上传任何数据，也不会修改任何数据。图片已外置到 IndexedDB；账本请使用首页的账本备份单独保存。</p>"
           ].join("");
         }
       }

@@ -2,7 +2,7 @@
 
 ## 1. 项目概述
 
-“月之暗面”是一个 local-only / offline-first 的本地离线单页面应用，用于多意识体场景下的聊天式记录、成员与群组管理、私聊、前台日志、交接、任务、议题 / 投票、照护、时间线回顾、复盘导出、账本伪装首页和系统资料整理。
+“月之暗面”是一个 local-only / offline-first 的本地离线单页面应用，用于多意识体场景下的聊天式记录、成员与群组管理、私聊、前台日志、交接、任务、议题 / 投票、照护、时间线回顾、复盘导出、本地账本首页和系统资料整理。
 
 页面入口是 `index.html`。应用可以通过 `file://` 直接打开，也可以通过本地 HTTP 服务打开，例如 `http://127.0.0.1:8080/index.html`。
 
@@ -87,7 +87,7 @@ LEDGER_KEY = "moonLedger.records.v1"
 - `KEY`：当前版本主数据。
 - `OLD_KEY`：旧版主数据兼容读取；保存只写 `KEY`。
 - `PREF_KEY`：用户偏好。
-- `LEDGER_KEY`：账本记录。账本仍独立存储，但完整 JSON 备份已经包含 `ledgerRecords`。
+- `LEDGER_KEY`：账本记录。账本独立存储，默认不进入主 `data`，也不进入主记录完整 JSON / encrypted-json 备份。
 
 图片迁移相关键名：
 
@@ -234,6 +234,7 @@ JSON 完整备份和 UI 完整 JSON 导出都使用同一语义：
 - 两者都会在导出对象的深拷贝上调用 `hydrateImagesForJsonExport()`。
 - hydrate 会读取 IndexedDB Blob，并在导出副本中补齐 `imageData/avatarData/backgroundData`。
 - hydrate 不修改运行时 `data`。
+- 主记录完整 JSON / encrypted-json 默认不包含 `ledgerRecords`。账本使用首页的账本专用 JSON / CSV 导出。
 
 JSON 导入路径：
 
@@ -254,6 +255,7 @@ importBackupFile(file)
 - 如果新版 JSON 同时包含 ID 和 DataURL，优先用 DataURL 恢复同 ID 图片。
 - `externalizeImagesAfterJsonImport()` 完成后会按现有规则重算所有消息 `integrity`。
 - JSON 导入失败不会覆盖当前 `data`。
+- 如果旧版主记录备份中存在 `ledgerRecords`，主记录导入只提示，不会自动覆盖当前账本。
 
 复盘报告和时间线只读取主数据摘要，只标记“含图片”，不读取 IndexedDB Blob，也不导出图片内容或 DataURL。
 
@@ -321,7 +323,7 @@ P0-P2 当前模块包括：
 - 自定义术语系统：自定义成员、系统、前台、交接、任务、照护、接续等界面词。
 - 时间线总览 + 月度回顾：只读聚合消息、前台、交接、议题、任务、照护；不聚合账本、不读图片 Blob、不修改 `data`。
 - 复盘报告导出：Markdown / TXT，只读生成；支持日期范围、章节开关、脱敏、排除私聊、隐藏成员名。
-- 账本伪装首页：账本记录仍存放在 `LEDGER_KEY`，业务 UI 不随 P2 改动。
+- 本地账本首页：账本记录存放在 `LEDGER_KEY`，与主记录完整备份隔离；首页提供账本 JSON / CSV 导出和账本 JSON 替换导入。
 
 ## 12. 导入导出
 
@@ -329,8 +331,10 @@ P0-P2 当前模块包括：
 
 - Markdown / TXT / CSV 支持脱敏导出。
 - JSON 用于完整备份，默认保留全量数据；完整 JSON 备份包含图片 DataURL hydrate 结果。
-- 局部 current / room JSON 不默认带出 `ledgerRecords`、`tasks`、`careLogs`、`careChecklist`。
-- 完整 all JSON 包含 `ledgerRecords`。
+- 局部 current / room JSON 不默认带出 `tasks`、`careLogs`、`careChecklist`。
+- 完整 all JSON 包含主记录数据、任务和照护数据，但不包含 `ledgerRecords`。
+- encrypted-json 复用完整 JSON，因此同样不包含 `ledgerRecords`。
+- 如需迁移账本，应使用首页的账本导入功能；旧版主记录备份里的 `ledgerRecords` 不会在主导入时自动恢复。
 
 复盘报告导出：
 

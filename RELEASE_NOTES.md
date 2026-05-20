@@ -30,6 +30,18 @@ P3-05 增加基础 PWA 支持：
 - 用户数据仍保存在当前浏览器的 `localStorage` + IndexedDB 中。Service Worker 不缓存用户导出的 JSON / `.moonenc.json` 文件、图片 Blob、IndexedDB 内容或 `localStorage` 内容。
 - 更新 app 文件后，浏览器可能需要刷新页面或清理此站点缓存 / Service Worker 才能看到最新静态文件。
 
+## P4-01 账本隔离与专用备份
+
+P4-01 将账本备份从主记录完整备份中拆出：
+
+- 主记录 JSON / encrypted-json 默认不再包含 `ledgerRecords`。
+- 主记录导入检测到旧版备份里的 `ledgerRecords` 时只提示，不会自动覆盖当前账本。
+- 账本首页新增账本专用 JSON 导出，格式为 `app: "moon-ledger"`、`kind: "ledger-backup"`、`version: 1`、`createdAt` 和 `records`。
+- 账本首页新增 CSV 导出，字段为 `date,type,amount,category,account,paymentMethod,note,createdAt,updatedAt`。
+- 账本 JSON 导入目前只支持替换当前账本，确认后只写入 `moonLedger.records.v1`，不影响主记录数据、偏好、IndexedDB 图片或 `messageIntegrity`。
+- 旧版主备份如需迁移账本，请到账本页使用账本导入功能；账本导入会拒绝读取包含 `rooms/messages/members` 等主记录字段的文件。
+- 账本专用备份可能包含现实财务信息，仍需谨慎保存和分享。
+
 ## P0-P2 已完成功能
 
 P0 阶段：
@@ -70,7 +82,7 @@ P2 阶段：
 
 - 主数据仍保存在 `localStorage` 的 `osddDidLocalJournal.v2`。
 - 偏好保存在 `osddDidLocalJournal.prefs.v1`。
-- 账本记录保存在 `moonLedger.records.v1`，完整 JSON 备份包含 `ledgerRecords`。
+- 账本记录保存在 `moonLedger.records.v1`，与主记录完整 JSON / encrypted-json 备份隔离。
 - 图片保存在 IndexedDB：`moon-images` / `images`。
 - 旧备份中的 `imageData/avatarData/backgroundData` 导入后会 externalize 到 IndexedDB。
 - 完整 JSON 导出会 hydrate 图片 DataURL，以便单文件备份。
@@ -78,7 +90,7 @@ P2 阶段：
 - `messageIntegrity` 规则没有在本版本发布验证中改动。
 - visibility / 隐私桶只影响应用内展示和导出，不是加密隔离。
 
-完整 JSON 备份包含 P0-P2 数据字段，例如 `frontingLogs`、`tasks`、`careLogs`、`careChecklist`、`polls` 新字段、`systemProfileVisibility`、`memberRelations`、`externalSystemCards` 和 `ledgerRecords`。
+完整 JSON 备份包含 P0-P2 主记录数据字段，例如 `frontingLogs`、`tasks`、`careLogs`、`careChecklist`、`polls` 新字段、`systemProfileVisibility`、`memberRelations` 和 `externalSystemCards`；不再默认包含 `ledgerRecords`。
 
 ## 已知限制
 

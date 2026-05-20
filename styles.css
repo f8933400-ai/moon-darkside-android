@@ -435,11 +435,14 @@
     .cover-more:hover, .cover-more:focus { opacity:.72; }
     .cover-main { flex:1; overflow:auto; overscroll-behavior:contain; padding:16px; max-width:760px; width:100%; margin:0 auto; }
     .cover-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
-    .cover-summary div, .cover-form, .cover-list { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; }
+    .cover-summary div, .cover-form, .cover-list, .ledger-tools { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; }
     .cover-summary span { display:block; color:#6b7280; font-size:12px; }
     .cover-summary strong { display:block; margin-top:5px; font-size:18px; }
     .cover-form { display:grid; gap:8px; margin-bottom:12px; }
     .cover-list { display:grid; gap:8px; }
+    .ledger-tools { display:grid; gap:10px; margin-top:12px; }
+    .ledger-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    .ledger-actions button { min-width:0; white-space:normal; }
     .ledger-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f3f4f6; }
     .ledger-row:last-child { border-bottom:0; }
     .ledger-row small { display:block; color:#9ca3af; margin-top:2px; }
@@ -572,7 +575,7 @@
     body.dark .annotate-canvas-wrap { border-color:#4b5563; }
     body.dark .annotate-toolbar button.active { background:#e5e7eb; color:#111827; border-color:#e5e7eb; }
     body.dark .cover-app { background:#111827; color:#e5e7eb; }
-    body.dark .cover-head, body.dark .cover-summary div, body.dark .cover-form, body.dark .cover-list { background:#1f2937; border-color:#374151; }
+    body.dark .cover-head, body.dark .cover-summary div, body.dark .cover-form, body.dark .cover-list, body.dark .ledger-tools { background:#1f2937; border-color:#374151; }
     body.dark .cover-summary span, body.dark .ledger-row small { color:#9ca3af; }
     body.dark .ledger-row { border-color:#374151; }
     @media (max-width:760px) {
@@ -657,6 +660,7 @@
       .care-check-item { align-items:stretch; flex-direction:column; }
       .care-check-item button { width:100%; }
       .cover-summary { grid-template-columns:1fr; }
+      .ledger-actions { grid-template-columns:1fr; }
       .tag-edit { grid-template-columns:1fr 62px; }
       .tag-edit button { grid-column:1 / -1; }
       .tag-edit input[type="color"] { width:62px; }
