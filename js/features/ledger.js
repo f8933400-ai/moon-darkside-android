@@ -21,7 +21,7 @@ function ledgerCsvCell(value){
   return `"${String(value==null?"":value).replace(/"/g,'""')}"`;
 }
 
-const LEDGER_EXPENSE_CATEGORIES=["餐饮","交通","购物","住房","医疗","学习","娱乐","其他"];
+const LEDGER_EXPENSE_CATEGORIES=["餐饮","交通","购物","住房","医疗","学习","娱乐","通讯","人情","其他"];
 const LEDGER_INCOME_CATEGORIES=["工资","兼职","报销","退款","礼金","其他"];
 const LEDGER_LIST_LIMIT=200;
 
@@ -57,6 +57,39 @@ function ledgerSetText(id,value){
   if(el)el.textContent=String(value);
 }
 
+function ledgerCurrentSettings(){
+  if(typeof normalizeLedgerSettings==="function")return normalizeLedgerSettings(typeof ledgerSettings!=="undefined"?ledgerSettings:null);
+  return {categories:[],budgets:[],defaultViewMode:"month"};
+}
+
+function ledgerCategoryColor(type,name){
+  const category=ledgerCurrentSettings().categories.find(item=>item.type===type&&item.name===name);
+  return category?.color||"";
+}
+
+function ledgerColor(value,type="expense"){
+  if(typeof normalizeLedgerColor==="function")return normalizeLedgerColor(value,type);
+  const color=String(value||"").trim();
+  if(/^#[0-9a-fA-F]{6}$/.test(color))return color;
+  return type==="income"?"#16a34a":"#ef4444";
+}
+
+function ledgerCategories(type,{includeArchived=false}={}){
+  return ledgerCurrentSettings().categories.filter(category=>(!type||category.type===type)&&(includeArchived||!category.archived));
+}
+
+function ledgerCategoryNameExists(name,type,excludeId=""){
+  const target=ledgerText(name).toLowerCase();
+  if(!target)return false;
+  return ledgerCurrentSettings().categories.some(category=>category.id!==excludeId&&category.type===type&&category.name.trim().toLowerCase()===target);
+}
+
+function ledgerRecordsUseCategory(name){
+  const target=ledgerText(name);
+  if(!target)return false;
+  return normalizeLedgerRecords(ledgerRecords||[]).some(record=>ledgerCategoryLabel(record)===target);
+}
+
 function ledgerCategoryLabel(record){
   return ledgerText(record?.category,"未分类");
 }
@@ -83,10 +116,24 @@ function syncLedgerCategoryOptions(){
   const type=document.getElementById("ledgerType")?.value==="income"?"income":"expense";
   const datalist=document.getElementById("ledgerCategoryOptions");
   if(!datalist)return;
-  const defaults=type==="income"?LEDGER_INCOME_CATEGORIES:LEDGER_EXPENSE_CATEGORIES;
-  const existing=normalizeLedgerRecords(ledgerRecords||[]).map(r=>r.category).filter(Boolean);
-  const values=[...new Set([...defaults,...existing])];
+  const settingsCategories=ledgerCategories(type,{includeArchived:false}).map(category=>category.name);
+  const fallback=type==="income"?LEDGER_INCOME_CATEGORIES:LEDGER_EXPENSE_CATEGORIES;
+  const values=[...new Set([...(settingsCategories.length?settingsCategories:fallback)])];
   datalist.innerHTML=values.map(value=>`<option value="${ledgerSafe(value)}"></option>`).join("");
+}
+
+function syncLedgerBudgetCategoryOptions(){
+  const select=document.getElementById("ledgerBudgetCategory");
+  if(!select)return;
+  const categories=ledgerCategories("expense",{includeArchived:true});
+  select.innerHTML=categories.map(category=>`<option value="${ledgerSafe(category.id)}">${ledgerSafe(category.name)}${category.archived?"（已归档）":""}</option>`).join("");
+}
+
+function applyLedgerDefaultViewMode(){
+  const mode=document.getElementById("ledgerViewMode");
+  if(!mode)return;
+  const preferred=ledgerCurrentSettings().defaultViewMode||"month";
+  if(["day","month","year","all"].includes(preferred))mode.value=preferred;
 }
 
 function setLedgerInitialInputValues(force=false){
@@ -94,14 +141,16 @@ function setLedgerInitialInputValues(force=false){
   const viewDate=document.getElementById("ledgerViewDate");
   const viewMonth=document.getElementById("ledgerViewMonth");
   const viewYear=document.getElementById("ledgerViewYear");
+  const budgetMonth=document.getElementById("ledgerBudgetMonth");
   if(date&&(force||!date.value))date.value=ledgerToday();
   if(viewDate&&(force||!viewDate.value))viewDate.value=ledgerToday();
   if(viewMonth&&(force||!viewMonth.value))viewMonth.value=ledgerMonth();
   if(viewYear&&(force||!viewYear.value))viewYear.value=ledgerYear();
+  if(budgetMonth&&(force||!budgetMonth.value))budgetMonth.value=ledgerMonth();
 }
 
 function syncLedgerFilterControls(){
-  const mode=document.getElementById("ledgerViewMode")?.value||"day";
+  const mode=document.getElementById("ledgerViewMode")?.value||ledgerCurrentSettings().defaultViewMode||"month";
   const dateWrap=document.querySelector(".ledger-view-date-wrap");
   const monthWrap=document.querySelector(".ledger-view-month-wrap");
   const yearWrap=document.querySelector(".ledger-view-year-wrap");
@@ -114,7 +163,7 @@ function resetLedgerFilters(){
   const mode=document.getElementById("ledgerViewMode");
   const type=document.getElementById("ledgerTypeFilter");
   const category=document.getElementById("ledgerCategoryFilter");
-  if(mode)mode.value="day";
+  if(mode)mode.value=ledgerCurrentSettings().defaultViewMode||"month";
   if(type)type.value="all";
   if(category)category.value="";
   setLedgerInitialInputValues(true);
@@ -165,6 +214,285 @@ function populateLedgerForm(record){
   document.getElementById("ledgerForm")?.scrollIntoView({block:"start",behavior:"smooth"});
 }
 
+function resetLedgerCategoryForm(){
+  try{if(typeof editingLedgerCategoryId!=="undefined")editingLedgerCategoryId=null;}catch{}
+  const name=document.getElementById("ledgerCategoryName");
+  const type=document.getElementById("ledgerCategoryType");
+  const color=document.getElementById("ledgerCategoryColor");
+  const submit=document.getElementById("addLedgerCategoryBtn");
+  const cancel=document.getElementById("cancelLedgerCategoryEditBtn");
+  if(name)name.value="";
+  if(type)type.value="expense";
+  if(color)color.value="#ef4444";
+  if(submit)submit.textContent="添加分类";
+  if(cancel)cancel.hidden=true;
+}
+
+function populateLedgerCategoryForm(categoryId){
+  const category=ledgerCurrentSettings().categories.find(item=>item.id===categoryId);
+  if(!category)return false;
+  const name=document.getElementById("ledgerCategoryName");
+  const type=document.getElementById("ledgerCategoryType");
+  const color=document.getElementById("ledgerCategoryColor");
+  const submit=document.getElementById("addLedgerCategoryBtn");
+  const cancel=document.getElementById("cancelLedgerCategoryEditBtn");
+  if(name)name.value=category.name;
+  if(type)type.value=category.type;
+  if(color)color.value=ledgerColor(category.color,category.type);
+  if(submit)submit.textContent="保存分类";
+  if(cancel)cancel.hidden=false;
+  document.getElementById("ledgerCategoryName")?.focus();
+  return true;
+}
+
+async function saveLedgerCategoryFromForm(categoryId=""){
+  const name=ledgerText(document.getElementById("ledgerCategoryName")?.value,"");
+  const type=document.getElementById("ledgerCategoryType")?.value==="income"?"income":"expense";
+  const color=ledgerColor(document.getElementById("ledgerCategoryColor")?.value,type);
+  if(!name){alert("请填写分类名称。"); return false;}
+  if(ledgerCategoryNameExists(name,type,categoryId)){alert("同类型下已经有这个分类。"); return false;}
+  const settings=ledgerCurrentSettings();
+  const savedAt=now();
+  if(categoryId){
+    const index=settings.categories.findIndex(category=>category.id===categoryId);
+    if(index<0){alert("没有找到要编辑的分类。"); return false;}
+    settings.categories[index]=normalizeLedgerCategory({...settings.categories[index],name,type,color,updatedAt:savedAt});
+  }else{
+    settings.categories.push(normalizeLedgerCategory({id:makeId(),name,type,color,archived:false,createdAt:savedAt,updatedAt:savedAt}));
+  }
+  if(!(await saveLedgerSettings(settings)))return false;
+  resetLedgerCategoryForm();
+  renderLedger();
+  return true;
+}
+
+async function setLedgerCategoryArchived(categoryId,archived){
+  const settings=ledgerCurrentSettings();
+  const index=settings.categories.findIndex(category=>category.id===categoryId);
+  if(index<0)return false;
+  settings.categories[index]=normalizeLedgerCategory({...settings.categories[index],archived:!!archived,updatedAt:now()});
+  if(!(await saveLedgerSettings(settings)))return false;
+  renderLedger();
+  return true;
+}
+
+function renderLedgerCategoryList(){
+  const box=document.getElementById("ledgerCategoryList");
+  if(!box)return;
+  const categories=[...ledgerCurrentSettings().categories].sort((a,b)=>{
+    if(a.type!==b.type)return a.type==="expense"?-1:1;
+    if(a.archived!==b.archived)return a.archived?1:-1;
+    return a.name.localeCompare(b.name,"zh-Hans-CN");
+  });
+  if(!categories.length){
+    box.innerHTML='<div class="ledger-empty compact">还没有分类。</div>';
+    return;
+  }
+  box.innerHTML=categories.map(category=>{
+    const typeLabel=category.type==="income"?"收入":"支出";
+    const archived=category.archived;
+    const used=ledgerRecordsUseCategory(category.name);
+    return `<div class="ledger-category-item ${archived?"archived":""}" data-ledger-category-id="${ledgerSafe(category.id)}">
+      <div class="ledger-category-main">
+        <span class="ledger-category-color" style="background:${ledgerSafe(ledgerColor(category.color,category.type))}"></span>
+        <div>
+          <strong>${ledgerSafe(category.name)}</strong>
+          <small>${typeLabel}${archived?" · 已归档":""}${used?" · 已有记录":""}</small>
+        </div>
+      </div>
+      <div class="ledger-record-actions">
+        <button class="light small" type="button" data-ledger-category-action="edit" data-ledger-category-id="${ledgerSafe(category.id)}">编辑</button>
+        ${archived
+          ?`<button class="light small" type="button" data-ledger-category-action="restore" data-ledger-category-id="${ledgerSafe(category.id)}">恢复</button>`
+          :`<button class="light small" type="button" data-ledger-category-action="archive" data-ledger-category-id="${ledgerSafe(category.id)}">归档</button>`}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function ledgerBudgetMonthValue(){
+  const month=String(document.getElementById("ledgerBudgetMonth")?.value||ledgerMonth()).slice(0,7);
+  return /^\d{4}-\d{2}$/.test(month)?month:ledgerMonth();
+}
+
+function ledgerBudgetFor(month,categoryName=""){
+  const key=ledgerText(categoryName,"");
+  return ledgerCurrentSettings().budgets.find(budget=>budget.month===month&&ledgerText(budget.categoryName,"")===key)||null;
+}
+
+function ledgerBudgetsForMonth(month){
+  return ledgerCurrentSettings().budgets
+    .filter(budget=>budget.month===month)
+    .sort((a,b)=>{
+      if(!a.categoryName&&b.categoryName)return -1;
+      if(a.categoryName&&!b.categoryName)return 1;
+      return ledgerText(a.categoryName,"本月总预算").localeCompare(ledgerText(b.categoryName,"本月总预算"),"zh-Hans-CN");
+    });
+}
+
+function ledgerMonthExpenseRecords(month){
+  return normalizeLedgerRecords(ledgerRecords||[]).filter(record=>record.type==="expense"&&String(record.date||"").slice(0,7)===month);
+}
+
+function ledgerMonthExpenseByCategory(month){
+  const totals=new Map();
+  ledgerMonthExpenseRecords(month).forEach(record=>{
+    const category=ledgerCategoryLabel(record);
+    totals.set(category,(totals.get(category)||0)+(Number(record.amount)||0));
+  });
+  return totals;
+}
+
+function ledgerBudgetProgressPercent(spent,budget){
+  const amount=Number(budget)||0;
+  const used=Number(spent)||0;
+  if(amount<=0)return used>0?100:0;
+  return Math.min(100,Math.max(0,(used/amount)*100));
+}
+
+function renderLedgerProgress(spent,budget,color){
+  const percent=ledgerBudgetProgressPercent(spent,budget);
+  return `<div class="ledger-progress" aria-hidden="true"><span class="ledger-progress-bar" style="width:${percent.toFixed(2)}%;background:${ledgerSafe(color)}"></span></div>`;
+}
+
+function ledgerBudgetStatusText(spent,budget){
+  const remaining=(Number(budget)||0)-(Number(spent)||0);
+  if(remaining<0)return `已超出 ${ledgerMoney(Math.abs(remaining))} 元`;
+  return `剩余额度 ${ledgerMoney(remaining)} 元`;
+}
+
+async function upsertLedgerBudget(month,categoryName,amount,categoryId=""){
+  const settings=ledgerCurrentSettings();
+  const name=ledgerText(categoryName,"");
+  const savedAt=now();
+  const index=settings.budgets.findIndex(budget=>budget.month===month&&ledgerText(budget.categoryName,"")===name);
+  const next=normalizeLedgerBudget({
+    ...(index>=0?settings.budgets[index]:{}),
+    id:index>=0?settings.budgets[index].id:makeId(),
+    scope:"monthly",
+    month,
+    categoryId:name?categoryId:"",
+    categoryName:name,
+    amount,
+    createdAt:index>=0?settings.budgets[index].createdAt:savedAt,
+    updatedAt:savedAt
+  });
+  if(index>=0)settings.budgets[index]=next;
+  else settings.budgets.push(next);
+  if(!(await saveLedgerSettings(settings)))return false;
+  renderLedger();
+  return true;
+}
+
+async function saveLedgerMonthlyBudgetFromForm(){
+  const month=ledgerBudgetMonthValue();
+  const raw=String(document.getElementById("ledgerMonthlyBudgetAmount")?.value||"").trim();
+  const amount=Number(raw);
+  if(raw===""||!Number.isFinite(amount)||amount<0){alert("请填写有效预算金额。"); return false;}
+  return upsertLedgerBudget(month,"",amount,"");
+}
+
+async function saveLedgerCategoryBudgetFromForm(){
+  const month=ledgerBudgetMonthValue();
+  const select=document.getElementById("ledgerBudgetCategory");
+  const categoryId=select?.value||"";
+  const category=ledgerCurrentSettings().categories.find(item=>item.id===categoryId);
+  if(!category){alert("请选择支出分类。"); return false;}
+  const raw=String(document.getElementById("ledgerCategoryBudgetAmount")?.value||"").trim();
+  const amount=Number(raw);
+  if(raw===""||!Number.isFinite(amount)||amount<0){alert("请填写有效预算金额。"); return false;}
+  return upsertLedgerBudget(month,category.name,amount,category.id);
+}
+
+async function deleteLedgerBudget(budgetId){
+  const settings=ledgerCurrentSettings();
+  const next=settings.budgets.filter(budget=>budget.id!==budgetId);
+  if(next.length===settings.budgets.length)return false;
+  settings.budgets=next;
+  if(!(await saveLedgerSettings(settings)))return false;
+  renderLedger();
+  return true;
+}
+
+function renderLedgerBudgetList(){
+  const box=document.getElementById("ledgerBudgetList");
+  if(!box)return;
+  const month=ledgerBudgetMonthValue();
+  const budgets=ledgerBudgetsForMonth(month);
+  if(!budgets.length){
+    box.innerHTML='<div class="ledger-empty compact">还没有设置这个月的预算。</div>';
+    return;
+  }
+  box.innerHTML=budgets.map(budget=>{
+    const isTotal=!ledgerText(budget.categoryName,"");
+    const label=isTotal?"本月总预算":budget.categoryName;
+    return `<div class="ledger-budget-item" data-ledger-budget-id="${ledgerSafe(budget.id)}">
+      <div>
+        <strong>${ledgerSafe(label)}</strong>
+        <small>${ledgerSafe(budget.month)} · ${isTotal?"总预算":"分类预算"}</small>
+      </div>
+      <div class="ledger-budget-side">
+        <strong>${ledgerMoney(budget.amount)}</strong>
+        <button class="danger small" type="button" data-ledger-budget-delete="${ledgerSafe(budget.id)}">删除</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderLedgerBudgetControls(){
+  const month=ledgerBudgetMonthValue();
+  const monthInput=document.getElementById("ledgerBudgetMonth");
+  if(monthInput&&!monthInput.value)monthInput.value=month;
+  syncLedgerBudgetCategoryOptions();
+  const totalBudget=ledgerBudgetFor(month,"");
+  const totalInput=document.getElementById("ledgerMonthlyBudgetAmount");
+  if(totalInput&&document.activeElement!==totalInput)totalInput.value=totalBudget?String(totalBudget.amount):"";
+  const categoryInput=document.getElementById("ledgerCategoryBudgetAmount");
+  if(categoryInput&&document.activeElement!==categoryInput)categoryInput.value="";
+  renderLedgerBudgetList();
+}
+
+function renderLedgerBudgetUsage(state=ledgerFilterState()){
+  const box=document.getElementById("ledgerBudgetUsage");
+  if(!box)return;
+  if(state.mode!=="month"){
+    box.innerHTML='<div class="ledger-empty compact">切换到按月查看预算使用情况。</div>';
+    return;
+  }
+  const month=state.month;
+  const budgets=ledgerBudgetsForMonth(month);
+  if(!budgets.length){
+    box.innerHTML='<div class="ledger-empty compact">还没有设置本月预算。</div>';
+    return;
+  }
+  const expenseTotal=ledgerTotals(ledgerMonthExpenseRecords(month)).expense;
+  const byCategory=ledgerMonthExpenseByCategory(month);
+  const totalBudget=budgets.find(budget=>!ledgerText(budget.categoryName,""));
+  const categoryBudgets=budgets.filter(budget=>ledgerText(budget.categoryName,""));
+  const totalHtml=totalBudget?`<div class="ledger-budget-item featured">
+    <div>
+      <strong>${ledgerSafe(month)} 总预算</strong>
+      <small>已用 ${ledgerMoney(expenseTotal)} / 预算 ${ledgerMoney(totalBudget.amount)} · ${ledgerBudgetStatusText(expenseTotal,totalBudget.amount)}</small>
+      ${renderLedgerProgress(expenseTotal,totalBudget.amount,"#ef4444")}
+    </div>
+    <strong>${totalBudget.amount>0?Math.round((expenseTotal/totalBudget.amount)*100):expenseTotal>0?100:0}%</strong>
+  </div>`:"";
+  const categoryHtml=categoryBudgets.map(budget=>{
+    const spent=byCategory.get(budget.categoryName)||0;
+    const color=ledgerCategoryColor("expense",budget.categoryName)||"#ef4444";
+    const percent=budget.amount>0?Math.round((spent/budget.amount)*100):spent>0?100:0;
+    return `<div class="ledger-budget-item">
+      <div>
+        <strong>${ledgerSafe(budget.categoryName)}</strong>
+        <small>已用 ${ledgerMoney(spent)} / 预算 ${ledgerMoney(budget.amount)} · ${ledgerBudgetStatusText(spent,budget.amount)}</small>
+        ${renderLedgerProgress(spent,budget.amount,color)}
+      </div>
+      <strong>${percent}%</strong>
+    </div>`;
+  }).join("");
+  box.innerHTML=totalHtml+categoryHtml||'<div class="ledger-empty compact">还没有设置本月预算。</div>';
+}
+
 function ledgerDateRange(records){
   const dates=normalizeLedgerRecords(records).map(r=>r.date).filter(Boolean).sort();
   if(!dates.length)return {start:"",end:"",label:"无日期"};
@@ -181,9 +509,10 @@ function ledgerTotals(records){
 }
 
 function ledgerFilterState(){
-  const mode=document.getElementById("ledgerViewMode")?.value||"day";
+  const defaultMode=ledgerCurrentSettings().defaultViewMode||"month";
+  const mode=document.getElementById("ledgerViewMode")?.value||defaultMode;
   return {
-    mode:["day","month","year","all"].includes(mode)?mode:"day",
+    mode:["day","month","year","all"].includes(mode)?mode:defaultMode,
     day:document.getElementById("ledgerViewDate")?.value||ledgerToday(),
     month:document.getElementById("ledgerViewMonth")?.value||ledgerMonth(),
     year:String(document.getElementById("ledgerViewYear")?.value||ledgerYear()).slice(0,4),
@@ -248,9 +577,21 @@ function ledgerGroupByAccount(records){
   return [...totals.values()].map(row=>({...row,balance:row.income-row.expense,total:row.income+row.expense})).sort((a,b)=>b.total-a.total||a.label.localeCompare(b.label,"zh-Hans-CN"));
 }
 
-function renderLedgerCategoryRows(rows,emptyText){
+function renderLedgerCategoryRows(rows,emptyText,type="expense"){
   if(!rows.length)return `<div class="ledger-empty compact">${ledgerSafe(emptyText)}</div>`;
-  return rows.map(row=>`<div class="ledger-summary-row"><span>${ledgerSafe(row.label)}</span><strong>${ledgerMoney(row.amount)}</strong></div>`).join("");
+  const max=Math.max(...rows.map(row=>Number(row.amount)||0),0);
+  return `<div class="ledger-chart-list">${rows.map(row=>{
+    const amount=Number(row.amount)||0;
+    const percent=max>0?Math.max(4,(amount/max)*100):0;
+    const color=ledgerCategoryColor(type,row.label)||ledgerColor("",type);
+    return `<div class="ledger-chart-row">
+      <div class="ledger-chart-head">
+        <span><i class="ledger-category-color" style="background:${ledgerSafe(color)}"></i>${ledgerSafe(row.label)}</span>
+        <strong>${ledgerMoney(amount)}</strong>
+      </div>
+      <div class="ledger-chart-track" aria-hidden="true"><span class="ledger-chart-bar" style="width:${percent.toFixed(2)}%;background:${ledgerSafe(color)}"></span></div>
+    </div>`;
+  }).join("")}</div>`;
 }
 
 function renderLedgerAccountRows(rows){
@@ -291,21 +632,27 @@ function renderLedgerRecords(records){
   }).join("");
 }
 
-function previewLedgerImport(records){
+function previewLedgerImport(records,settings=ledgerCurrentSettings(),hasSettings=false){
   const normalized=normalizeLedgerRecords(records);
+  const normalizedSettings=normalizeLedgerSettings(settings);
   const range=ledgerDateRange(normalized);
   const totals=ledgerTotals(normalized);
+  const importMode=hasSettings?"导入方式：替换当前账本记录和账本设置":"导入方式：只替换账本记录，保留当前账本设置";
   return {
     count:normalized.length,
     range,
     income:totals.income,
     expense:totals.expense,
+    categories:normalizedSettings.categories.length,
+    budgets:normalizedSettings.budgets.length,
     text:[
       `记录数量：${normalized.length}`,
       `日期范围：${range.label}`,
       `总收入：${totals.income.toFixed(2)}`,
       `总支出：${totals.expense.toFixed(2)}`,
-      "导入方式：替换当前账本"
+      `分类数量：${normalizedSettings.categories.length}`,
+      `预算数量：${normalizedSettings.budgets.length}`,
+      importMode
     ].join("\n")
   };
 }
@@ -329,16 +676,60 @@ function parseLedgerImportPayload(payload){
     throw new Error("main_backup_for_ledger");
   }
   if(payload?.kind==="ledger-backup"&&Array.isArray(payload.records)){
-    return payload.records;
+    const version=Number(payload.version)||1;
+    const hasSettings=version>=2;
+    if(hasSettings)validateLedgerBackupSettingsPayload(payload.settings);
+    return {
+      version,
+      records:payload.records,
+      settings:hasSettings?payload.settings:ledgerCurrentSettings(),
+      hasSettings
+    };
   }
   if(Array.isArray(payload?.ledgerRecords)){
-    return payload.ledgerRecords;
+    return {version:1,records:payload.ledgerRecords,settings:ledgerCurrentSettings(),hasSettings:false};
   }
   throw new Error("invalid_ledger_backup");
 }
 
+async function rollbackLedgerImport(previousRecords,previousSettings,restoreSettings=true){
+  ledgerRecords=normalizeLedgerRecords(previousRecords);
+  ledgerSettings=normalizeLedgerSettings(previousSettings);
+  try{await storage.saveLedger(ledgerRecords);}
+  catch(err){console.warn("rollbackLedgerImport: records restore failed",err);}
+  if(restoreSettings){
+    try{await storage.saveLedgerSettings(ledgerSettings);}
+    catch(err){console.warn("rollbackLedgerImport: settings restore failed",err);}
+  }
+  renderLedger();
+}
+
+async function saveLedgerRecordsForImport(records){
+  const normalized=normalizeLedgerRecords(records);
+  try{
+    await storage.saveLedger(normalized);
+    ledgerRecords=normalized;
+    return true;
+  }catch(err){
+    console.warn("saveLedgerRecordsForImport failed",err);
+    return false;
+  }
+}
+
+async function saveLedgerSettingsForImport(settings){
+  const normalized=normalizeLedgerSettings(settings);
+  try{
+    await storage.saveLedgerSettings(normalized);
+    ledgerSettings=normalized;
+    return true;
+  }catch(err){
+    console.warn("saveLedgerSettingsForImport failed",err);
+    return false;
+  }
+}
+
 function exportLedgerJson(){
-  const backup=buildLedgerBackup(ledgerRecords||[]);
+  const backup=buildLedgerBackup(ledgerRecords||[],ledgerCurrentSettings());
   downloadLedgerFile(`moon-ledger-backup-${ledgerFilenameStamp()}.json`,"application/json",JSON.stringify(backup,null,2));
 }
 
@@ -353,20 +744,38 @@ async function importLedgerJsonFile(file){
   if(!file)return false;
   try{
     const parsed=JSON.parse(await readLedgerJsonFile(file));
-    const records=parseLedgerImportPayload(parsed);
-    const normalizedRecords=normalizeLedgerRecords(records);
-    const preview=previewLedgerImport(normalizedRecords);
+    const payload=parseLedgerImportPayload(parsed);
+    const normalizedRecords=normalizeLedgerRecords(payload.records);
+    const normalizedSettings=payload.hasSettings?normalizeLedgerSettings(payload.settings):ledgerCurrentSettings();
+    const preview=previewLedgerImport(normalizedRecords,normalizedSettings,payload.hasSettings);
     const ok=confirm(`确认用此账本备份替换当前账本吗？这不会影响记录界面的任何数据。\n\n${preview.text}`);
     if(!ok)return false;
-    if(!(await saveLedger(normalizedRecords)))return false;
+    const previousRecords=normalizeLedgerRecords(ledgerRecords||[]);
+    const previousSettings=ledgerCurrentSettings();
+    if(payload.hasSettings){
+      const savedRecords=await saveLedgerRecordsForImport(normalizedRecords);
+      const savedSettings=savedRecords?await saveLedgerSettingsForImport(normalizedSettings):false;
+      if(!savedRecords||!savedSettings){
+        await rollbackLedgerImport(previousRecords,previousSettings,true);
+        alert("导入失败，已尽量保留原账本。");
+        return false;
+      }
+    }else if(!(await saveLedgerRecordsForImport(normalizedRecords))){
+      await rollbackLedgerImport(previousRecords,previousSettings,false);
+      alert("导入失败，已尽量保留原账本。");
+      return false;
+    }
     if(typeof resetLedgerForm==="function")resetLedgerForm();
+    if(typeof resetLedgerCategoryForm==="function")resetLedgerCategoryForm();
     renderLedger();
     alert("账本备份已导入。");
     return true;
   }catch(err){
-    console.error("importLedgerJsonFile failed",err);
+    console.warn("importLedgerJsonFile failed",err);
     if(err?.message==="main_backup_for_ledger"){
       alert("这看起来是主记录备份。请使用主记录导入功能；账本导入不会读取其中的其他数据。");
+    }else if(err?.message==="invalid_ledger_settings"){
+      alert("导入失败：账本设置格式不正确。");
     }else{
       alert("导入失败：请选择有效的账本备份 JSON。");
     }
@@ -378,6 +787,7 @@ function renderLedger(){
   setLedgerInitialInputValues(false);
   syncLedgerFilterControls();
   syncLedgerCategoryOptions();
+  syncLedgerBudgetCategoryOptions();
   const state=ledgerFilterState();
   const records=ledgerFilteredRecords(ledgerRecords||[],state);
   const totals=ledgerTotals(records);
@@ -394,11 +804,14 @@ function renderLedger(){
   const accountBox=document.getElementById("ledgerAccountSummary");
   const list=document.getElementById("ledgerList");
   const note=document.getElementById("ledgerListNote");
-  if(expenseBox)expenseBox.innerHTML=renderLedgerCategoryRows(ledgerGroupByCategory(records,"expense"),"当前筛选下没有支出记录");
-  if(incomeBox)incomeBox.innerHTML=renderLedgerCategoryRows(ledgerGroupByCategory(records,"income"),"当前筛选下没有收入记录");
+  if(expenseBox)expenseBox.innerHTML=renderLedgerCategoryRows(ledgerGroupByCategory(records,"expense"),"当前筛选下没有支出记录","expense");
+  if(incomeBox)incomeBox.innerHTML=renderLedgerCategoryRows(ledgerGroupByCategory(records,"income"),"当前筛选下没有收入记录","income");
   if(accountBox)accountBox.innerHTML=renderLedgerAccountRows(ledgerGroupByAccount(records));
   if(note)note.textContent=records.length>LEDGER_LIST_LIMIT?"记录较多，仅显示最近 200 条。":"按日期倒序排列。";
   if(list)list.innerHTML=renderLedgerRecords(records);
+  renderLedgerCategoryList();
+  renderLedgerBudgetControls();
+  renderLedgerBudgetUsage(state);
 }
 
 window.ledgerToday=ledgerToday;
@@ -414,8 +827,17 @@ window.exportLedgerCsv=exportLedgerCsv;
 window.importLedgerJsonFile=importLedgerJsonFile;
 window.setLedgerInitialInputValues=setLedgerInitialInputValues;
 window.syncLedgerCategoryOptions=syncLedgerCategoryOptions;
+window.syncLedgerBudgetCategoryOptions=syncLedgerBudgetCategoryOptions;
+window.applyLedgerDefaultViewMode=applyLedgerDefaultViewMode;
 window.syncLedgerFilterControls=syncLedgerFilterControls;
 window.resetLedgerFilters=resetLedgerFilters;
 window.resetLedgerForm=resetLedgerForm;
 window.populateLedgerForm=populateLedgerForm;
+window.resetLedgerCategoryForm=resetLedgerCategoryForm;
+window.populateLedgerCategoryForm=populateLedgerCategoryForm;
+window.saveLedgerCategoryFromForm=saveLedgerCategoryFromForm;
+window.setLedgerCategoryArchived=setLedgerCategoryArchived;
+window.saveLedgerMonthlyBudgetFromForm=saveLedgerMonthlyBudgetFromForm;
+window.saveLedgerCategoryBudgetFromForm=saveLedgerCategoryBudgetFromForm;
+window.deleteLedgerBudget=deleteLedgerBudget;
 window.renderLedger=renderLedger;

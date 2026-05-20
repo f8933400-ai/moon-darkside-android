@@ -1,7 +1,7 @@
     /* ── Tauri 桌面端桥接：让现有 MoonBridge 接口在 Tauri 下生效 ── */
     (function setupTauriBridge(){if(!window.__TAURI_INTERNALS__)return; const invoke=window.__TAURI_INTERNALS__.invoke; if(typeof invoke!=="function")return; window.MoonBridge=window.MoonBridge||{}; window.MoonBridge.authenticate=function(){invoke("moon_authenticate").then(()=>{window.onMoonAuthResult&&window.onMoonAuthResult(true,"");}).catch(err=>{const msg=String(err?.message||err||""); const display=/cancel|user.*cancel|取消/i.test(msg)?"已取消":("验证失败："+(msg||"未知错误")); window.onMoonAuthResult&&window.onMoonAuthResult(false,display);});};})();
     (function setupViewportHeight(){const sync=()=>{document.body.style.setProperty("--app-height",`${window.innerHeight}px`);}; sync(); window.addEventListener("resize",sync,{passive:true}); window.addEventListener("orientationchange",()=>setTimeout(sync,240),{passive:true}); if(window.visualViewport)window.visualViewport.addEventListener("resize",sync,{passive:true});})();
-    let data; let prefs; let ledgerRecords=[]; let editingLedgerId=null; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover";
+    let data; let prefs; let ledgerRecords=[]; let ledgerSettings={categories:[],budgets:[],defaultViewMode:"month"}; let editingLedgerId=null; let editingLedgerCategoryId=null; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover";
     const list=document.getElementById("list"), messages=document.getElementById("messages"), roomName=document.getElementById("roomName"), roomDesc=document.getElementById("roomDesc"), speaker=document.getElementById("speaker"), kind=document.getElementById("kind"), search=document.getElementById("search"), fontSize=document.getElementById("fontSize"), fontSizeValue=document.getElementById("fontSizeValue"), themeBtn=document.getElementById("themeBtn"), contextMenu=document.getElementById("contextMenu"), imageInput=document.getElementById("imageInput"), importInput=document.getElementById("importInput"), memberAvatarInput=document.getElementById("memberAvatarInput"), roomBgInput=document.getElementById("roomBgInput"), drawerBtn=document.getElementById("drawerBtn"), drawerBackdrop=document.getElementById("drawerBackdrop");
     function showMenu(e,items){e.preventDefault(); e.stopPropagation(); contextMenu.innerHTML=items.map((item,i)=>`<button class="${item.danger?"danger-action":""}" data-i="${i}">${esc(item.label)}</button>`).join(""); contextMenu.style.display="block"; const rect=contextMenu.getBoundingClientRect(); contextMenu.style.left=Math.min(e.clientX,window.innerWidth-rect.width-8)+"px"; contextMenu.style.top=Math.min(e.clientY,window.innerHeight-rect.height-8)+"px"; contextMenu.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{const item=items[Number(btn.dataset.i)]; closeMenu(); item.action();});}
     function closeMenu(){contextMenu.style.display="none"; contextMenu.innerHTML="";}
@@ -110,6 +110,40 @@
     const ledgerImportJsonBtn=document.getElementById("ledgerImportJsonBtn"); const ledgerImportJsonInput=document.getElementById("ledgerImportJsonInput");
     if(ledgerImportJsonBtn&&ledgerImportJsonInput)ledgerImportJsonBtn.onclick=()=>{ledgerImportJsonInput.value=""; ledgerImportJsonInput.click();};
     if(ledgerImportJsonInput)ledgerImportJsonInput.onchange=()=>{const file=ledgerImportJsonInput.files?.[0]; ledgerImportJsonInput.value=""; window.importLedgerJsonFile&&window.importLedgerJsonFile(file);};
+    const addLedgerCategoryBtn=document.getElementById("addLedgerCategoryBtn"); if(addLedgerCategoryBtn)addLedgerCategoryBtn.addEventListener("click",async()=>{if(window.saveLedgerCategoryFromForm&&await window.saveLedgerCategoryFromForm(editingLedgerCategoryId||""))editingLedgerCategoryId=null;});
+    const cancelLedgerCategoryEditBtn=document.getElementById("cancelLedgerCategoryEditBtn"); if(cancelLedgerCategoryEditBtn)cancelLedgerCategoryEditBtn.addEventListener("click",()=>{editingLedgerCategoryId=null; if(window.resetLedgerCategoryForm)window.resetLedgerCategoryForm();});
+    const ledgerCategoryTypeEl=document.getElementById("ledgerCategoryType"); if(ledgerCategoryTypeEl)ledgerCategoryTypeEl.addEventListener("change",()=>{const color=document.getElementById("ledgerCategoryColor"); if(color&&!editingLedgerCategoryId)color.value=ledgerCategoryTypeEl.value==="income"?"#16a34a":"#ef4444";});
+    const ledgerCategoryList=document.getElementById("ledgerCategoryList");
+    if(ledgerCategoryList)ledgerCategoryList.addEventListener("click",async e=>{
+      const btn=e.target.closest("[data-ledger-category-action][data-ledger-category-id]");
+      if(!btn||!ledgerCategoryList.contains(btn))return;
+      const id=btn.dataset.ledgerCategoryId;
+      const action=btn.dataset.ledgerCategoryAction;
+      if(action==="edit"){
+        editingLedgerCategoryId=id;
+        if(window.populateLedgerCategoryForm&&!window.populateLedgerCategoryForm(id))editingLedgerCategoryId=null;
+        return;
+      }
+      if(action==="archive"){
+        if(!confirm("归档后不会影响已有记录，只是不再作为常用分类显示。确认归档吗？"))return;
+        if(window.setLedgerCategoryArchived)await window.setLedgerCategoryArchived(id,true);
+        if(editingLedgerCategoryId===id){editingLedgerCategoryId=null; if(window.resetLedgerCategoryForm)window.resetLedgerCategoryForm();}
+        return;
+      }
+      if(action==="restore"){
+        if(window.setLedgerCategoryArchived)await window.setLedgerCategoryArchived(id,false);
+      }
+    });
+    const ledgerBudgetMonthEl=document.getElementById("ledgerBudgetMonth"); if(ledgerBudgetMonthEl)ledgerBudgetMonthEl.addEventListener("change",()=>renderLedger());
+    const saveLedgerMonthlyBudgetBtn=document.getElementById("saveLedgerMonthlyBudgetBtn"); if(saveLedgerMonthlyBudgetBtn)saveLedgerMonthlyBudgetBtn.addEventListener("click",()=>window.saveLedgerMonthlyBudgetFromForm&&window.saveLedgerMonthlyBudgetFromForm());
+    const saveLedgerCategoryBudgetBtn=document.getElementById("saveLedgerCategoryBudgetBtn"); if(saveLedgerCategoryBudgetBtn)saveLedgerCategoryBudgetBtn.addEventListener("click",()=>window.saveLedgerCategoryBudgetFromForm&&window.saveLedgerCategoryBudgetFromForm());
+    const ledgerBudgetList=document.getElementById("ledgerBudgetList");
+    if(ledgerBudgetList)ledgerBudgetList.addEventListener("click",async e=>{
+      const btn=e.target.closest("[data-ledger-budget-delete]");
+      if(!btn||!ledgerBudgetList.contains(btn))return;
+      if(!confirm("确认删除这条预算吗？"))return;
+      if(window.deleteLedgerBudget)await window.deleteLedgerBudget(btn.dataset.ledgerBudgetDelete);
+    });
     document.querySelectorAll(".settings-tabs button").forEach(btn=>btn.onclick=()=>{const modal=btn.closest(".modal")||document; modal.querySelectorAll(".settings-tabs button").forEach(x=>x.classList.remove("active")); modal.querySelectorAll(".settings-panel").forEach(x=>x.classList.remove("active")); btn.classList.add("active"); document.getElementById(btn.dataset.panel).classList.add("active");});
     const settingsTermsTab=document.getElementById("settingsTermsTab"); if(settingsTermsTab)settingsTermsTab.addEventListener("click",()=>window.populateTermsSettings&&window.populateTermsSettings());
     const saveTermsBtn=document.getElementById("saveTermsBtn"); if(saveTermsBtn)saveTermsBtn.onclick=()=>window.saveTermsFromSettings&&window.saveTermsFromSettings();
@@ -360,10 +394,12 @@
       data=await load();
       prefs=await loadPrefs();
       ledgerRecords=await loadLedger();
+      ledgerSettings=await loadLedgerSettings();
       currentRoomId=data.rooms[0]?.id||"main";
       appMode=prefs.resetToCover===false?(prefs.lastAppMode||"cover"):"cover";
       await closeDuePolls();
       await runAutoImageMigrationIfNeeded();
+      if(window.applyLedgerDefaultViewMode)window.applyLedgerDefaultViewMode();
       applyPrefs();
       if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels();
       render();

@@ -36,6 +36,15 @@
           <div class="ledger-stat-card"><span>记录条数</span><strong id="ledgerRecordCount">0</strong></div>
         </div>
       </section>
+      <section class="ledger-panel ledger-budget-usage">
+        <div class="ledger-section-head">
+          <div>
+            <h2>预算使用情况</h2>
+            <p>预算只按月统计支出。</p>
+          </div>
+        </div>
+        <div id="ledgerBudgetUsage"></div>
+      </section>
       <form class="ledger-panel ledger-form" id="ledgerForm">
         <div class="ledger-section-head">
           <div>
@@ -61,9 +70,25 @@
           <option value="工资"></option><option value="兼职"></option><option value="报销"></option><option value="退款"></option><option value="礼金"></option>
         </datalist>
       </form>
+      <section class="ledger-panel ledger-category-manager">
+        <div class="ledger-section-head">
+          <div>
+            <h2>分类管理</h2>
+            <p>归档分类不会影响已有记录。</p>
+          </div>
+        </div>
+        <div class="ledger-category-form">
+          <input id="ledgerCategoryName" placeholder="分类名称" />
+          <select id="ledgerCategoryType"><option value="expense">支出</option><option value="income">收入</option></select>
+          <input id="ledgerCategoryColor" type="color" value="#ef4444" aria-label="分类颜色" />
+          <button id="addLedgerCategoryBtn" type="button">添加分类</button>
+          <button class="light" id="cancelLedgerCategoryEditBtn" type="button" hidden>取消编辑</button>
+        </div>
+        <div class="ledger-category-list" id="ledgerCategoryList"></div>
+      </section>
       <section class="ledger-panel ledger-filter-bar">
         <div class="ledger-filter-grid">
-          <label>查看<select id="ledgerViewMode"><option value="day">按日</option><option value="month">按月</option><option value="year">按年</option><option value="all">全部</option></select></label>
+          <label>查看<select id="ledgerViewMode"><option value="day">按日</option><option value="month" selected>按月</option><option value="year">按年</option><option value="all">全部</option></select></label>
           <label class="ledger-view-date-wrap">日期<input id="ledgerViewDate" type="date" /></label>
           <label class="ledger-view-month-wrap" hidden>月份<input id="ledgerViewMonth" type="month" /></label>
           <label class="ledger-view-year-wrap" hidden>年份<input id="ledgerViewYear" type="number" min="1900" max="2999" step="1" /></label>
@@ -71,6 +96,23 @@
           <label>分类<input id="ledgerCategoryFilter" list="ledgerCategoryOptions" placeholder="全部分类" /></label>
           <button class="light" id="ledgerResetFilterBtn" type="button">重置筛选</button>
         </div>
+      </section>
+      <section class="ledger-panel ledger-budget-panel">
+        <div class="ledger-section-head">
+          <div>
+            <h2>月度预算</h2>
+            <p>总预算和分类预算只统计支出。</p>
+          </div>
+        </div>
+        <div class="ledger-budget-grid">
+          <label>预算月份<input id="ledgerBudgetMonth" type="month" /></label>
+          <label>本月总预算<input id="ledgerMonthlyBudgetAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></label>
+          <button id="saveLedgerMonthlyBudgetBtn" type="button">保存总预算</button>
+          <label>分类预算<select id="ledgerBudgetCategory"></select></label>
+          <label>分类预算金额<input id="ledgerCategoryBudgetAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></label>
+          <button id="saveLedgerCategoryBudgetBtn" type="button">保存分类预算</button>
+        </div>
+        <div class="ledger-budget-list" id="ledgerBudgetList"></div>
       </section>
       <section class="ledger-panel ledger-category-summary">
         <div class="ledger-summary-columns">

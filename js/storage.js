@@ -30,22 +30,157 @@ function normalizeLedgerRecordsForBackup(records){
   return normalizeLedgerRecords(records);
 }
 
+const LEDGER_SETTINGS_KEY="moonLedger.settings.v1";
+const LEDGER_DEFAULT_CATEGORIES=[
+  {id:"expense-food",type:"expense",name:"餐饮",color:"#ef4444"},
+  {id:"expense-transport",type:"expense",name:"交通",color:"#f97316"},
+  {id:"expense-shopping",type:"expense",name:"购物",color:"#eab308"},
+  {id:"expense-housing",type:"expense",name:"住房",color:"#22c55e"},
+  {id:"expense-medical",type:"expense",name:"医疗",color:"#14b8a6"},
+  {id:"expense-study",type:"expense",name:"学习",color:"#3b82f6"},
+  {id:"expense-fun",type:"expense",name:"娱乐",color:"#8b5cf6"},
+  {id:"expense-phone",type:"expense",name:"通讯",color:"#06b6d4"},
+  {id:"expense-gift",type:"expense",name:"人情",color:"#ec4899"},
+  {id:"expense-other",type:"expense",name:"其他",color:"#64748b"},
+  {id:"income-salary",type:"income",name:"工资",color:"#16a34a"},
+  {id:"income-part-time",type:"income",name:"兼职",color:"#059669"},
+  {id:"income-reimburse",type:"income",name:"报销",color:"#0d9488"},
+  {id:"income-refund",type:"income",name:"退款",color:"#0284c7"},
+  {id:"income-gift",type:"income",name:"礼金",color:"#7c3aed"},
+  {id:"income-other",type:"income",name:"其他",color:"#64748b"}
+];
+
+function normalizeLedgerColor(value,type="expense"){
+  const color=String(value||"").trim();
+  if(/^#[0-9a-fA-F]{6}$/.test(color))return color;
+  return type==="income"?"#16a34a":"#ef4444";
+}
+
+function normalizeLedgerCategory(category){
+  const source=category&&typeof category==="object"?category:{};
+  const type=source.type==="income"?"income":"expense";
+  const createdAt=String(source.createdAt||now());
+  const name=String(source.name||"").trim()||"其他";
+  return {
+    id:String(source.id||makeId()),
+    name,
+    type,
+    color:normalizeLedgerColor(source.color,type),
+    archived:!!source.archived,
+    createdAt,
+    updatedAt:String(source.updatedAt||createdAt||now())
+  };
+}
+
+function normalizeLedgerBudget(budget){
+  const source=budget&&typeof budget==="object"?budget:{};
+  const amount=Number(source.amount);
+  const createdAt=String(source.createdAt||now());
+  const month=String(source.month||ledgerLocalDate().slice(0,7)).slice(0,7);
+  return {
+    id:String(source.id||makeId()),
+    scope:"monthly",
+    month:/^\d{4}-\d{2}$/.test(month)?month:ledgerLocalDate().slice(0,7),
+    categoryId:String(source.categoryId||""),
+    categoryName:String(source.categoryName||"").trim(),
+    amount:Number.isFinite(amount)&&amount>=0?amount:0,
+    note:String(source.note||""),
+    createdAt,
+    updatedAt:String(source.updatedAt||createdAt||now())
+  };
+}
+
+function defaultLedgerSettings(){
+  const createdAt=now();
+  return {
+    categories:LEDGER_DEFAULT_CATEGORIES.map(category=>normalizeLedgerCategory({...category,createdAt,updatedAt:createdAt})),
+    budgets:[],
+    defaultViewMode:"month"
+  };
+}
+
+function isPlainLedgerObject(value){
+  return !!value&&typeof value==="object"&&!Array.isArray(value);
+}
+
+function normalizeLedgerCategoryList(categories){
+  if(!Array.isArray(categories))return [];
+  const normalized=[];
+  const seen=new Set();
+  categories.forEach(category=>{
+    if(!isPlainLedgerObject(category))return;
+    const name=String(category.name||"").trim();
+    if(!name)return;
+    const item=normalizeLedgerCategory({...category,name});
+    const key=`${item.type}:${item.name.trim().toLowerCase()}`;
+    if(seen.has(key))return;
+    seen.add(key);
+    normalized.push(item);
+  });
+  return normalized;
+}
+
+function normalizeLedgerBudgetList(budgets,categories){
+  if(!Array.isArray(budgets))return [];
+  const categoryById=new Map((Array.isArray(categories)?categories:[]).map(category=>[category.id,category]));
+  return budgets.filter(isPlainLedgerObject).map(normalizeLedgerBudget).map(budget=>{
+    if(!budget.categoryName&&budget.categoryId&&categoryById.has(budget.categoryId)){
+      return {...budget,categoryName:categoryById.get(budget.categoryId).name};
+    }
+    return budget;
+  });
+}
+
+function normalizeLedgerSettings(settings){
+  const source=isPlainLedgerObject(settings)?settings:{};
+  const defaults=defaultLedgerSettings();
+  const hasCategoryArray=Array.isArray(source.categories);
+  const categories=hasCategoryArray&&source.categories.length>0?normalizeLedgerCategoryList(source.categories):defaults.categories;
+  const budgets=normalizeLedgerBudgetList(source.budgets,categories);
+  return {
+    categories,
+    budgets,
+    defaultViewMode:["day","month","year","all"].includes(source.defaultViewMode)?source.defaultViewMode:"month"
+  };
+}
+
+function normalizeLedgerSettingsForBackup(settings){
+  return normalizeLedgerSettings(settings);
+}
+
+function validateLedgerBackupSettingsPayload(settings){
+  if(!isPlainLedgerObject(settings))throw new Error("invalid_ledger_settings");
+  if("categories" in settings&&!Array.isArray(settings.categories))throw new Error("invalid_ledger_settings");
+  if("budgets" in settings&&!Array.isArray(settings.budgets))throw new Error("invalid_ledger_settings");
+  return true;
+}
+
 function getRuntimeLedgerRecordsForBackup(){
   try{return typeof ledgerRecords!=="undefined"&&Array.isArray(ledgerRecords)?ledgerRecords:[];}
   catch{return [];}
+}
+
+function getRuntimeLedgerSettingsForBackup(){
+  try{return typeof ledgerSettings!=="undefined"&&ledgerSettings&&typeof ledgerSettings==="object"?ledgerSettings:defaultLedgerSettings();}
+  catch{return defaultLedgerSettings();}
 }
 
 function currentLedgerRecordsForBackup(){
   return getRuntimeLedgerRecordsForBackup();
 }
 
-function buildLedgerBackup(records=getRuntimeLedgerRecordsForBackup()){
+function currentLedgerSettingsForBackup(){
+  return getRuntimeLedgerSettingsForBackup();
+}
+
+function buildLedgerBackup(records=getRuntimeLedgerRecordsForBackup(),settings=getRuntimeLedgerSettingsForBackup()){
   return {
     app:"moon-ledger",
     kind:"ledger-backup",
-    version:1,
+    version:2,
     createdAt:now(),
-    records:normalizeLedgerRecords(records)
+    records:normalizeLedgerRecords(records),
+    settings:normalizeLedgerSettingsForBackup(settings)
   };
 }
 
@@ -121,6 +256,25 @@ class LocalStorageAdapter{
       return true;
     }catch(err){
       console.error("saveLedger failed",err);
+      throw err;
+    }
+  }
+
+  async loadLedgerSettings(){
+    try{
+      return normalizeLedgerSettings(JSON.parse(localStorage.getItem(LEDGER_SETTINGS_KEY)||"{}"));
+    }catch(err){
+      console.error("loadLedgerSettings failed",err);
+      return defaultLedgerSettings();
+    }
+  }
+
+  async saveLedgerSettings(settings){
+    try{
+      localStorage.setItem(LEDGER_SETTINGS_KEY,JSON.stringify(normalizeLedgerSettings(settings)));
+      return true;
+    }catch(err){
+      console.error("saveLedgerSettings failed",err);
       throw err;
     }
   }
@@ -255,11 +409,41 @@ async function saveLedger(records){
   }
 }
 
+async function loadLedgerSettings(){
+  ledgerSettings=await storage.loadLedgerSettings();
+  return ledgerSettings;
+}
+
+async function saveLedgerSettings(settings){
+  const normalized=normalizeLedgerSettings(settings);
+  try{
+    const ok=await storage.saveLedgerSettings(normalized);
+    if(ok)ledgerSettings=normalized;
+    return ok;
+  }
+  catch(err){
+    alert("账本设置保存失败："+(err?.message||"未知错误"));
+    return false;
+  }
+}
+
+window.LEDGER_SETTINGS_KEY=LEDGER_SETTINGS_KEY;
 window.normalizeLedgerRecord=normalizeLedgerRecord;
 window.normalizeLedgerRecords=normalizeLedgerRecords;
 window.normalizeLedgerRecordsForBackup=normalizeLedgerRecordsForBackup;
+window.defaultLedgerSettings=defaultLedgerSettings;
+window.normalizeLedgerSettings=normalizeLedgerSettings;
+window.normalizeLedgerSettingsForBackup=normalizeLedgerSettingsForBackup;
+window.normalizeLedgerColor=normalizeLedgerColor;
+window.normalizeLedgerCategory=normalizeLedgerCategory;
+window.normalizeLedgerBudget=normalizeLedgerBudget;
+window.validateLedgerBackupSettingsPayload=validateLedgerBackupSettingsPayload;
 window.getRuntimeLedgerRecordsForBackup=getRuntimeLedgerRecordsForBackup;
+window.getRuntimeLedgerSettingsForBackup=getRuntimeLedgerSettingsForBackup;
 window.currentLedgerRecordsForBackup=currentLedgerRecordsForBackup;
+window.currentLedgerSettingsForBackup=currentLedgerSettingsForBackup;
 window.buildLedgerBackup=buildLedgerBackup;
 window.exportLedgerBackup=exportLedgerBackup;
 window.importLedgerBackup=importLedgerBackup;
+window.loadLedgerSettings=loadLedgerSettings;
+window.saveLedgerSettings=saveLedgerSettings;

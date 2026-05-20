@@ -62,6 +62,7 @@
 - `data`：运行时主数据对象，包含成员、房间、消息、标签、议题、前台日志、任务、照护、系统资料等。
 - `prefs`：偏好对象，包含字号、主题、锁定、封面策略、当前视角、私聊管理模式、接续面板入口、自定义术语等。
 - `ledgerRecords`：账本记录数组，独立于主 `data` 存储。
+- `ledgerSettings`：账本分类、月度预算和默认账本视图设置，独立于主 `data` 和 `prefs` 存储。
 - `currentRoomId`：当前打开的房间 ID。
 - `tab`：侧边栏当前页签，常见值为 `rooms`、`private`、`members`。
 - `appMode`：封面 / 记录界面的当前模式。
@@ -82,12 +83,14 @@ OLD_KEY = "osddDidLocalJournal.v1"
 ```js
 PREF_KEY = "osddDidLocalJournal.prefs.v1"
 LEDGER_KEY = "moonLedger.records.v1"
+LEDGER_SETTINGS_KEY = "moonLedger.settings.v1"
 ```
 
 - `KEY`：当前版本主数据。
 - `OLD_KEY`：旧版主数据兼容读取；保存只写 `KEY`。
 - `PREF_KEY`：用户偏好。
 - `LEDGER_KEY`：账本记录。账本独立存储，默认不进入主 `data`，也不进入主记录完整 JSON / encrypted-json 备份。
+- `LEDGER_SETTINGS_KEY`：账本分类、预算和默认视图。账本设置独立存储，不进入主 `data`、`prefs` 或主记录完整 JSON / encrypted-json 备份。
 
 图片迁移相关键名：
 
@@ -234,7 +237,7 @@ JSON 完整备份和 UI 完整 JSON 导出都使用同一语义：
 - 两者都会在导出对象的深拷贝上调用 `hydrateImagesForJsonExport()`。
 - hydrate 会读取 IndexedDB Blob，并在导出副本中补齐 `imageData/avatarData/backgroundData`。
 - hydrate 不修改运行时 `data`。
-- 主记录完整 JSON / encrypted-json 默认不包含 `ledgerRecords`。账本使用首页的账本专用 JSON / CSV 导出。
+- 主记录完整 JSON / encrypted-json 默认不包含 `ledgerRecords` 或 `ledgerSettings`。账本使用首页的账本专用 JSON / CSV 导出。
 
 JSON 导入路径：
 
@@ -292,14 +295,16 @@ importBackupFile(file)
 2. `data = await load()`
 3. `prefs = await loadPrefs()`
 4. `ledgerRecords = await loadLedger()`
-5. `currentRoomId = data.rooms[0]?.id || "main"`
-6. `appMode = prefs.resetToCover===false ? (prefs.lastAppMode || "cover") : "cover"`
-7. `await closeDuePolls()`
-8. `await runAutoImageMigrationIfNeeded()`
-9. `applyPrefs()`
-10. `applyTermsToStaticLabels()`
-11. `render()`
-12. `applyAppMode()`
+5. `ledgerSettings = await loadLedgerSettings()`
+6. `currentRoomId = data.rooms[0]?.id || "main"`
+7. `appMode = prefs.resetToCover===false ? (prefs.lastAppMode || "cover") : "cover"`
+8. `await closeDuePolls()`
+9. `await runAutoImageMigrationIfNeeded()`
+10. `applyLedgerDefaultViewMode()`
+11. `applyPrefs()`
+12. `applyTermsToStaticLabels()`
+13. `render()`
+14. `applyAppMode()`
 
 `render()` 在 `js/render.js`，负责刷新视角、列表、发言身份、分类、聊天、投票、交接、系统档案、成员关系、结构视图、系统名片和前台状态。
 
@@ -323,7 +328,7 @@ P0-P2 当前模块包括：
 - 自定义术语系统：自定义成员、系统、前台、交接、任务、照护、接续等界面词。
 - 时间线总览 + 月度回顾：只读聚合消息、前台、交接、议题、任务、照护；不聚合账本、不读图片 Blob、不修改 `data`。
 - 复盘报告导出：Markdown / TXT，只读生成；支持日期范围、章节开关、脱敏、排除私聊、隐藏成员名。
-- 本地账本首页：账本记录存放在 `LEDGER_KEY`，与主记录完整备份隔离；首页提供收支 CRUD、日 / 月 / 年 / 全部统计、账本 JSON / CSV 导出和账本 JSON 替换导入。
+- 本地账本首页：账本记录存放在 `LEDGER_KEY`，账本分类和预算设置存放在 `LEDGER_SETTINGS_KEY`，与主记录完整备份隔离；首页提供收支 CRUD、分类管理、月度总预算、分类预算、日 / 月 / 年 / 全部统计、CSS 条形图、账本 JSON / CSV 导出和账本 JSON 替换导入。
 
 ## 12. 导入导出
 
@@ -332,9 +337,9 @@ P0-P2 当前模块包括：
 - Markdown / TXT / CSV 支持脱敏导出。
 - JSON 用于完整备份，默认保留全量数据；完整 JSON 备份包含图片 DataURL hydrate 结果。
 - 局部 current / room JSON 不默认带出 `tasks`、`careLogs`、`careChecklist`。
-- 完整 all JSON 包含主记录数据、任务和照护数据，但不包含 `ledgerRecords`。
-- encrypted-json 复用完整 JSON，因此同样不包含 `ledgerRecords`。
-- 如需迁移账本，应使用首页的账本导入功能；旧版主记录备份里的 `ledgerRecords` 不会在主导入时自动恢复。
+- 完整 all JSON 包含主记录数据、任务和照护数据，但不包含 `ledgerRecords` 或 `ledgerSettings`。
+- encrypted-json 复用完整 JSON，因此同样不包含 `ledgerRecords` 或 `ledgerSettings`。
+- 如需迁移账本，应使用首页的账本导入功能；旧版主记录备份里的 `ledgerRecords` 不会在主导入时自动恢复。账本 JSON v2 会携带 records 和 settings，导入时替换账本记录和账本设置；v1 只携带 records，导入时只替换账本记录并保留当前账本设置。分类改名不会批量迁移旧记录里的 `category` 字符串，分类预算按 `categoryName` 匹配旧记录分类名。
 
 复盘报告导出：
 

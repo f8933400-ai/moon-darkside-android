@@ -40,6 +40,20 @@
         }
       }
 
+      function estimateLedgerSettingsCounts(){
+        try{
+          const key=typeof LEDGER_SETTINGS_KEY==="string"?LEDGER_SETTINGS_KEY:"moonLedger.settings.v1";
+          const parsed=JSON.parse(localStorage.getItem(key)||"{}");
+          const settings=typeof normalizeLedgerSettings==="function"?normalizeLedgerSettings(parsed):parsed;
+          return {
+            categories:Array.isArray(settings.categories)?settings.categories.length:0,
+            budgets:Array.isArray(settings.budgets)?settings.budgets.length:0
+          };
+        }catch{
+          return {categories:0,budgets:0};
+        }
+      }
+
       function formatBytes(bytes){
         const n=Number(bytes);
         if(!Number.isFinite(n)||n<0)return "未知";
@@ -87,6 +101,9 @@
         const main=estimateLocalStorageEntrySize(KEY);
         const prefsEntry=estimateLocalStorageEntrySize(PREF_KEY);
         const ledger=estimateLocalStorageEntrySize(LEDGER_KEY);
+        const ledgerSettingsKey=typeof LEDGER_SETTINGS_KEY==="string"?LEDGER_SETTINGS_KEY:"moonLedger.settings.v1";
+        const ledgerSettingsEntry=estimateLocalStorageEntrySize(ledgerSettingsKey);
+        const ledgerSettingsCounts=estimateLedgerSettingsCounts();
         const messages=safeArray(appData.messages);
         const members=safeArray(appData.members);
         const rooms=safeArray(appData.rooms);
@@ -115,7 +132,10 @@
           main,
           prefs:prefsEntry,
           ledger,
+          ledgerSettings:ledgerSettingsEntry,
           ledgerRecordCount:estimateLedgerRecordCount(),
+          ledgerCategoryCount:ledgerSettingsCounts.categories,
+          ledgerBudgetCount:ledgerSettingsCounts.budgets,
           imageCount:imageRecords.length,
           imageBytes,
           imageSizeKnown:imageRecords.length===0||imageSizes.length>0,
@@ -154,6 +174,9 @@
             renderStat("偏好大小",formatBytes(stats.prefs.bytes),`${stats.prefs.chars} 字符，PREF_KEY`),
             renderStat("账本大小",formatBytes(stats.ledger.bytes),`${stats.ledger.chars} 字符，LEDGER_KEY`),
             renderStat("账本记录数",formatCount(stats.ledgerRecordCount),"只统计数量"),
+            renderStat("账本设置大小",formatBytes(stats.ledgerSettings.bytes),`${stats.ledgerSettings.chars} 字符，LEDGER_SETTINGS_KEY`),
+            renderStat("账本分类数",formatCount(stats.ledgerCategoryCount),"只统计数量"),
+            renderStat("账本预算数",formatCount(stats.ledgerBudgetCount),"只统计数量"),
             renderStat("IndexedDB 图片数量",formatCount(stats.imageCount),stats.imageError||"moon-images / images"),
             renderStat("IndexedDB 图片总大小",stats.imageSizeKnown?formatBytes(stats.imageBytes):"未知","来自 listImages() 摘要"),
             renderStat("消息数",formatCount(stats.counts.messages),""),

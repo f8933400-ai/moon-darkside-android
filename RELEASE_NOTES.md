@@ -42,6 +42,28 @@ P4-01 将账本备份从主记录完整备份中拆出：
 - 旧版主备份如需迁移账本，请到账本页使用账本导入功能；账本导入会拒绝读取包含 `rooms/messages/members` 等主记录字段的文件。
 - 账本专用备份可能包含现实财务信息，仍需谨慎保存和分享。
 
+## P4-02 真实账本 CRUD 与统计
+
+P4-02 将首页账本升级为普通本地账本：
+
+- 支持新增、编辑、删除收入和支出记录。
+- 记录字段包含日期、金额、分类、账户 / 钱包、支付方式和备注，金额为 0 的记录会被保留。
+- 支持按日、月、年、全部查看，并支持类型和分类筛选。
+- 统计支出合计、收入合计、结余、记录条数、分类汇总、账户 / 钱包汇总和最近记录。
+- 账本 JSON / CSV 专用导出导入继续与主记录完整备份隔离。
+
+## P4-03 分类管理、预算与统计图表基础版
+
+P4-03 增强账本设置和统计视图：
+
+- 新增独立账本设置键 `moonLedger.settings.v1`，保存分类、月度预算和默认账本视图。
+- 默认分类会在没有账本设置时自动补齐，分类支持添加、编辑、归档和恢复。
+- 新增月度总预算和分类预算，只统计支出，并显示剩余额度、已用比例和超支提示。
+- 支出 / 收入分类汇总增加本地 CSS 条形图，不引入图表库或联网依赖。
+- 账本 JSON 备份升级到 version 2，包含 `records` 和 `settings`；version 1 账本备份仍可导入，且只替换账本记录、保留当前账本设置。
+- 分类改名不会批量迁移旧记录里的 `category` 字符串，分类预算按 `categoryName` 兼容旧记录。
+- CSV 仍只导出账本记录；主记录 JSON / encrypted-json 仍不包含 `ledgerRecords` 或 `ledgerSettings`。
+
 ## P0-P2 已完成功能
 
 P0 阶段：
@@ -82,7 +104,7 @@ P2 阶段：
 
 - 主数据仍保存在 `localStorage` 的 `osddDidLocalJournal.v2`。
 - 偏好保存在 `osddDidLocalJournal.prefs.v1`。
-- 账本记录保存在 `moonLedger.records.v1`，与主记录完整 JSON / encrypted-json 备份隔离。
+- 账本记录保存在 `moonLedger.records.v1`，账本设置保存在 `moonLedger.settings.v1`，与主记录完整 JSON / encrypted-json 备份隔离。
 - 图片保存在 IndexedDB：`moon-images` / `images`。
 - 旧备份中的 `imageData/avatarData/backgroundData` 导入后会 externalize 到 IndexedDB。
 - 完整 JSON 导出会 hydrate 图片 DataURL，以便单文件备份。
@@ -90,7 +112,7 @@ P2 阶段：
 - `messageIntegrity` 规则没有在本版本发布验证中改动。
 - visibility / 隐私桶只影响应用内展示和导出，不是加密隔离。
 
-完整 JSON 备份包含 P0-P2 主记录数据字段，例如 `frontingLogs`、`tasks`、`careLogs`、`careChecklist`、`polls` 新字段、`systemProfileVisibility`、`memberRelations` 和 `externalSystemCards`；不再默认包含 `ledgerRecords`。
+完整 JSON 备份包含 P0-P2 主记录数据字段，例如 `frontingLogs`、`tasks`、`careLogs`、`careChecklist`、`polls` 新字段、`systemProfileVisibility`、`memberRelations` 和 `externalSystemCards`；不再默认包含 `ledgerRecords` 或 `ledgerSettings`。
 
 ## 已知限制
 
