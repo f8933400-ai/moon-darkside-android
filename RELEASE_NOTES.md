@@ -1,5 +1,18 @@
 # 发布说明
 
+## P6-03 跨平台测试安装包路线规划
+
+P6-03 恢复跨平台测试安装包路线规划，但本轮仍不实际打包，也不新增平台工程：
+
+- 新增 `P6-03_CROSS_PLATFORM_PACKAGE_PLAN.md`，规划 Android APK、macOS DMG、iOS 自签测试包 / IPA 试制路线。
+- 明确 P6 产物用于本机和小范围测试，不是正式公开分发包。
+- 明确没有 Apple Developer Program 时，macOS 缺少 Developer ID 签名 / notarization 可能触发 Gatekeeper，iOS 不能使用 App Store、TestFlight 或正式 Ad Hoc 分发。
+- 明确三端都必须保持 local-only / offline-first，不把用户数据、真实备份或敏感样本打进安装包，不新增联网同步。
+- 明确安装包和平台构建产物不提交 git，建议输出到仓库外。
+- 明确下一阶段从 `feature/p6-04-android-apk-test-wrapper` 的 Android WebView APK 测试壳开始。
+
+本轮没有业务代码改动，没有生成 APK / DMG / IPA，没有新增 npm、CDN、远程 API、构建步骤或 `type="module"`。
+
 ## P6-02 低风险维护修复与封包前回归
 
 P6-02 继续暂停 Android APK / macOS DMG / iOS IPA 试制，收束代码审查中剩余的中低风险维护问题：
