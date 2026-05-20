@@ -534,7 +534,10 @@
         if(!id)return false;
         const el=document.querySelector(`.msg[data-message-id="${searchSelectorValue(id)}"]`);
         if(!el){
-          if(attempt<8)setTimeout(()=>highlightSearchHitMessage(id,attempt+1),80);
+          if((attempt===0||attempt===3)&&typeof window.scrollVirtualChatToMessage==="function"){
+            Promise.resolve(window.scrollVirtualChatToMessage(id)).catch(err=>console.warn("search virtual jump failed",err));
+          }
+          if(attempt<8)setTimeout(()=>{const pending=String(window._pendingSearchHitMessageId||""); if(!pending||pending===id)highlightSearchHitMessage(id,attempt+1);},80);
           return false;
         }
         try{el.scrollIntoView({behavior:"smooth",block:"center"});}catch{el.scrollIntoView();}

@@ -79,7 +79,7 @@
     document.getElementById("kindManageBtn").onclick=()=>{renderKindManager(); openModal("kindModal");};
     document.getElementById("saveKindBtn").onclick=saveKind;
     document.getElementById("deleteKindBtn").onclick=()=>deleteKind(kind.value);
-    document.getElementById("messageForm").addEventListener("submit",async e=>{e.preventDefault(); const text=document.getElementById("message").value.trim(); const sp=member(speaker.value); if(!text||!sp)return; data.messages.push(makeMessage({roomId:currentRoomId,speakerId:sp.id,speakerName:sp.name,kind:document.getElementById("kind").value,text})); if(!(await save()))return; document.getElementById("message").value=""; render();});
+    document.getElementById("messageForm").addEventListener("submit",async e=>{e.preventDefault(); const text=document.getElementById("message").value.trim(); const sp=member(speaker.value); if(!text||!sp)return; data.messages.push(makeMessage({roomId:currentRoomId,speakerId:sp.id,speakerName:sp.name,kind:document.getElementById("kind").value,text})); if(!(await save()))return; document.getElementById("message").value=""; if(typeof window.markChatShouldScrollToBottom==="function")window.markChatShouldScrollToBottom(); render();});
     document.getElementById("imageBtn").onclick=()=>imageInput.click();
     imageInput.onchange=()=>{const file=imageInput.files?.[0]; imageInput.value=""; if(!file)return; openSendImagePreview(file);};
     document.getElementById("chooseMemberAvatarBtn").onclick=()=>memberAvatarInput.click();
