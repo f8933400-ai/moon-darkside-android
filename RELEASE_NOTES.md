@@ -1,5 +1,18 @@
 # 发布说明
 
+## P6-04 Android WebView APK 测试包
+
+P6-04 新增 Android WebView APK 测试壳，并生成 debug APK 测试包：
+
+- 新增 `platforms/android/` Android Gradle 工程，使用 Java `MainActivity` 和 AndroidX `WebViewAssetLoader` 加载 APK 内本地静态 app shell。
+- Web app 静态资源在 Gradle 构建时复制到 generated assets，不重复提交 `assets/www`，并排除 `.git`、`node_modules`、真实备份、包产物和临时文件。
+- Android debug APK 输出到仓库外 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，不提交 APK 或 build 输出。
+- AndroidManifest 不申请 `INTERNET`、相机、定位、通讯录、麦克风或存储权限；测试壳不新增联网同步。
+- WebView 启用 JavaScript、DOM storage 和文件选择器，支持后续验证 localStorage、IndexedDB、JSON 导入和图片选择；Blob 下载 / 导出行为仍需设备运行验收。
+- 本轮没有修改 Web app 核心业务语义，没有改变主记录、encrypted-json、账本、图片、锁屏或 integrity 规则。
+
+当前环境没有连接 Android 设备或可用模拟器，因此 APK 安装、打开、localStorage、IndexedDB、图片、备份、账本、锁屏和 QR 的运行态验收已记录为未执行，留到 P6-07 综合验收或人工设备测试。下一阶段进入 macOS DMG 测试壳。
+
 ## P6-03 跨平台测试安装包路线规划
 
 P6-03 恢复跨平台测试安装包路线规划，但本轮仍不实际打包，也不新增平台工程：

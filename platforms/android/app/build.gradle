@@ -1,0 +1,78 @@
+plugins {
+    id "com.android.application"
+}
+
+def repoRoot = rootProject.projectDir.parentFile.parentFile
+def generatedAssetsDir = layout.buildDirectory.dir("generated/moon-web-assets")
+def generatedWebDir = layout.buildDirectory.dir("generated/moon-web-assets/www")
+
+android {
+    namespace "moon.darkside.android"
+
+    compileSdk {
+        version = release(36) {
+            minorApiLevel = 1
+        }
+    }
+
+    defaultConfig {
+        applicationId "moon.darkside.android"
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName "0.4.1-android-test"
+    }
+
+    sourceSets {
+        main {
+            assets.srcDir(generatedAssetsDir.get().asFile)
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.register("syncMoonWebAssets", Copy) {
+    description = "Copies the current Moon web app shell into generated Android assets."
+    from(repoRoot) {
+        include "index.html"
+        include "styles.css"
+        include "manifest.webmanifest"
+        include "sw.js"
+        include "favicon.ico"
+        include "app_icon.png"
+        include "app_icon_192.png"
+        include "app_icon_512.png"
+        include "js/**"
+
+        exclude ".git/**"
+        exclude "node_modules/**"
+        exclude "platforms/**"
+        exclude "*.zip"
+        exclude "*.apk"
+        exclude "*.aab"
+        exclude "*.dmg"
+        exclude "*.ipa"
+        exclude "*.moonenc.json"
+        exclude "*backup*.json"
+        exclude ".DS_Store"
+        exclude "**/.DS_Store"
+        exclude "*.tmp"
+        exclude "*.bak"
+        exclude "*.log"
+    }
+    into(generatedWebDir)
+}
+
+tasks.configureEach { task ->
+    if (task.name.startsWith("merge") && task.name.endsWith("Assets")) {
+        task.dependsOn(tasks.named("syncMoonWebAssets"))
+    }
+}
+
+dependencies {
+    implementation "androidx.webkit:webkit:1.16.0"
+}

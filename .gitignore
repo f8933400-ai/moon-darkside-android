@@ -1,5 +1,10 @@
 .DS_Store
 *.zip
+*.apk
+*.aab
+*.dmg
+*.ipa
+*.xcarchive
 *.log
 *.bak
 *.tmp
@@ -13,3 +18,12 @@ build/
 coverage/
 .vscode/
 .idea/
+
+# Android package-test wrapper outputs
+platforms/android/.gradle/
+platforms/android/**/build/
+platforms/android/local.properties
+platforms/android/*.apk
+platforms/android/*.aab
+platforms/android/**/*.apk
+platforms/android/**/*.aab
