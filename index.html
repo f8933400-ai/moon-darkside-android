@@ -18,6 +18,7 @@
       <div>
         <h1>本地账本</h1>
         <p class="sub" id="ledgerHeaderSubtitle">今日收支</p>
+        <p class="ledger-cover-note">收支、预算和备份都保存在当前浏览器。</p>
       </div>
       <button class="light cover-more" id="coverSettingsBtn" type="button" title="设置" aria-label="设置">&#9881;</button>
     </div>
@@ -52,11 +53,12 @@
             <p>金额可以为 0，备注可留空。</p>
           </div>
         </div>
+        <div class="ledger-inline-message" id="ledgerInlineMessage" hidden></div>
         <div class="ledger-form-grid">
           <label>类型<select id="ledgerType"><option value="expense">支出</option><option value="income">收入</option></select></label>
           <label>金额<input id="ledgerAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></label>
           <label>日期<input id="ledgerDate" type="date" /></label>
-          <label>分类<input id="ledgerCategory" list="ledgerCategoryOptions" placeholder="例如 餐饮、交通、工资" /></label>
+          <label>分类<input id="ledgerCategory" list="ledgerCategoryOptions" placeholder="例如 餐饮、交通、工资" /><small class="ledger-input-hint" id="ledgerCategoryHint">可从常用分类中选择，也可以直接输入。</small></label>
           <label>账户 / 钱包<input id="ledgerAccount" placeholder="例如现金、银行卡、支付宝、微信、其他" /></label>
           <label>支付方式<input id="ledgerPaymentMethod" placeholder="例如现金、扫码、转账、刷卡" /></label>
         </div>
@@ -74,9 +76,10 @@
         <div class="ledger-section-head">
           <div>
             <h2>分类管理</h2>
-            <p>归档分类不会影响已有记录。</p>
+            <p>归档分类不会影响已有记录；改名不会自动修改旧记录。</p>
           </div>
         </div>
+        <div class="ledger-inline-message compact" id="ledgerCategoryMessage" hidden></div>
         <div class="ledger-category-form">
           <input id="ledgerCategoryName" placeholder="分类名称" />
           <select id="ledgerCategoryType"><option value="expense">支出</option><option value="income">收入</option></select>
@@ -87,15 +90,23 @@
         <div class="ledger-category-list" id="ledgerCategoryList"></div>
       </section>
       <section class="ledger-panel ledger-filter-bar">
+        <div class="ledger-section-head">
+          <div>
+            <h2>查看和筛选</h2>
+            <p>筛选只影响当前显示和统计，不会修改账本记录。</p>
+          </div>
+        </div>
         <div class="ledger-filter-grid">
           <label>查看<select id="ledgerViewMode"><option value="day">按日</option><option value="month" selected>按月</option><option value="year">按年</option><option value="all">全部</option></select></label>
           <label class="ledger-view-date-wrap">日期<input id="ledgerViewDate" type="date" /></label>
           <label class="ledger-view-month-wrap" hidden>月份<input id="ledgerViewMonth" type="month" /></label>
           <label class="ledger-view-year-wrap" hidden>年份<input id="ledgerViewYear" type="number" min="1900" max="2999" step="1" /></label>
           <label>类型<select id="ledgerTypeFilter"><option value="all">全部类型</option><option value="expense">支出</option><option value="income">收入</option></select></label>
-          <label>分类<input id="ledgerCategoryFilter" list="ledgerCategoryOptions" placeholder="全部分类" /></label>
+          <label>分类<input id="ledgerCategoryFilter" list="ledgerFilterCategoryOptions" placeholder="全部分类" /></label>
           <button class="light" id="ledgerResetFilterBtn" type="button">重置筛选</button>
         </div>
+        <div class="ledger-filter-summary" id="ledgerFilterSummary">当前筛选：本月收支 · 全部类型 · 全部分类</div>
+        <datalist id="ledgerFilterCategoryOptions"></datalist>
       </section>
       <section class="ledger-panel ledger-budget-panel">
         <div class="ledger-section-head">
@@ -104,6 +115,7 @@
             <p>总预算和分类预算只统计支出。</p>
           </div>
         </div>
+        <div class="ledger-inline-message compact" id="ledgerBudgetMessage" hidden></div>
         <div class="ledger-budget-grid">
           <label>预算月份<input id="ledgerBudgetMonth" type="month" /></label>
           <label>本月总预算<input id="ledgerMonthlyBudgetAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></label>
@@ -115,6 +127,12 @@
         <div class="ledger-budget-list" id="ledgerBudgetList"></div>
       </section>
       <section class="ledger-panel ledger-category-summary">
+        <div class="ledger-section-head">
+          <div>
+            <h2>分类和账户汇总</h2>
+            <p>条形图按当前筛选结果计算。</p>
+          </div>
+        </div>
         <div class="ledger-summary-columns">
           <div><h3>支出分类汇总</h3><div id="ledgerExpenseCategorySummary"></div></div>
           <div><h3>收入分类汇总</h3><div id="ledgerIncomeCategorySummary"></div></div>
@@ -128,10 +146,16 @@
         <div id="ledgerList"></div>
       </section>
       <section class="ledger-panel ledger-tools">
-        <strong>账本备份</strong>
+        <div class="ledger-section-head">
+          <div>
+            <h2>账本备份</h2>
+            <p>JSON 可用于完整恢复账本，CSV 适合表格查看。</p>
+          </div>
+        </div>
+        <div class="ledger-tools-note">JSON v2 包含记录和账本设置；旧版 JSON v1 导入时只替换记录并保留当前设置。CSV 只导出记录。</div>
         <div class="ledger-actions">
           <button class="light" id="ledgerExportJsonBtn" type="button">导出账本备份</button>
-          <button class="light" id="ledgerExportCsvBtn" type="button">导出 CSV</button>
+          <button class="light" id="ledgerExportCsvBtn" type="button">导出 CSV 表格</button>
           <button id="ledgerImportJsonBtn" type="button">导入账本备份</button>
           <input id="ledgerImportJsonInput" type="file" accept="application/json,.json" hidden />
         </div>

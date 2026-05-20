@@ -64,6 +64,17 @@ P4-03 增强账本设置和统计视图：
 - 分类改名不会批量迁移旧记录里的 `category` 字符串，分类预算按 `categoryName` 兼容旧记录。
 - CSV 仍只导出账本记录；主记录 JSON / encrypted-json 仍不包含 `ledgerRecords` 或 `ledgerSettings`。
 
+## P4-04 账本首页体验增强
+
+P4-04 打磨本地账本首页的日常可用性：
+
+- 优化账本首页布局，补充筛选摘要、空态提示和轻量操作反馈。
+- 分类管理按支出 / 收入分组展示，归档分类与常用分类更容易区分。
+- 预算区域补充非月视图提示、分类预算空态和更清晰的预算百分比。
+- 账本备份区域说明 JSON / CSV 用途区别：JSON v2 包含 `records` 和 `settings`，CSV 只包含 records。
+- 移动端表单、按钮、分类名、备注和条形图继续避免横向溢出。
+- 主记录 JSON / encrypted-json 仍不包含 `ledgerRecords` 或 `ledgerSettings`。
+
 ## P0-P2 已完成功能
 
 P0 阶段：

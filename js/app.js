@@ -49,12 +49,14 @@
     if(window.setLedgerInitialInputValues)window.setLedgerInitialInputValues();
     const ledgerForm=document.getElementById("ledgerForm");
     const ledgerValue=id=>document.getElementById(id)?.value||"";
+    const ledgerMessage=(id,message,type="success")=>{if(window.ledgerShowMessage)window.ledgerShowMessage(id,message,type);};
     if(ledgerForm)ledgerForm.addEventListener("submit",async e=>{
       e.preventDefault();
       const rawAmount=ledgerValue("ledgerAmount").trim();
       const amount=Number(rawAmount);
       if(rawAmount===""||!Number.isFinite(amount)||amount<0){alert("请填写有效金额。");return;}
       const savedAt=now();
+      const wasEditing=!!editingLedgerId;
       const payload={
         type:ledgerValue("ledgerType")==="income"?"income":"expense",
         amount,
@@ -76,9 +78,10 @@
       editingLedgerId=null;
       if(window.resetLedgerForm)window.resetLedgerForm();
       renderLedger();
+      ledgerMessage("ledgerInlineMessage",wasEditing?"收支记录已保存。":"已添加一笔收支。");
     });
     const ledgerTypeInput=document.getElementById("ledgerType"); if(ledgerTypeInput)ledgerTypeInput.addEventListener("change",()=>window.syncLedgerCategoryOptions&&window.syncLedgerCategoryOptions());
-    const ledgerCancelEditBtn=document.getElementById("ledgerCancelEditBtn"); if(ledgerCancelEditBtn)ledgerCancelEditBtn.addEventListener("click",()=>{editingLedgerId=null; if(window.resetLedgerForm)window.resetLedgerForm(); renderLedger();});
+    const ledgerCancelEditBtn=document.getElementById("ledgerCancelEditBtn"); if(ledgerCancelEditBtn)ledgerCancelEditBtn.addEventListener("click",()=>{editingLedgerId=null; if(window.resetLedgerForm)window.resetLedgerForm(); renderLedger(); ledgerMessage("ledgerInlineMessage","已取消编辑。","info");});
     ["ledgerViewMode","ledgerViewDate","ledgerViewMonth","ledgerViewYear","ledgerTypeFilter"].forEach(id=>{const el=document.getElementById(id); if(el)el.addEventListener("change",()=>renderLedger());});
     const ledgerCategoryFilter=document.getElementById("ledgerCategoryFilter"); if(ledgerCategoryFilter){ledgerCategoryFilter.addEventListener("input",()=>renderLedger()); ledgerCategoryFilter.addEventListener("change",()=>renderLedger());}
     const ledgerResetFilterBtn=document.getElementById("ledgerResetFilterBtn"); if(ledgerResetFilterBtn)ledgerResetFilterBtn.addEventListener("click",()=>{if(window.resetLedgerFilters)window.resetLedgerFilters(); renderLedger();});
@@ -103,15 +106,16 @@
         if(!(await saveLedger(next)))return;
         if(editingLedgerId===id){editingLedgerId=null; if(window.resetLedgerForm)window.resetLedgerForm();}
         renderLedger();
+        ledgerMessage("ledgerInlineMessage","收支记录已删除。");
       }
     });
-    const ledgerExportJsonBtn=document.getElementById("ledgerExportJsonBtn"); if(ledgerExportJsonBtn)ledgerExportJsonBtn.onclick=()=>window.exportLedgerJson&&window.exportLedgerJson();
-    const ledgerExportCsvBtn=document.getElementById("ledgerExportCsvBtn"); if(ledgerExportCsvBtn)ledgerExportCsvBtn.onclick=()=>window.exportLedgerCsv&&window.exportLedgerCsv();
+    const ledgerExportJsonBtn=document.getElementById("ledgerExportJsonBtn"); if(ledgerExportJsonBtn)ledgerExportJsonBtn.onclick=()=>{if(window.exportLedgerJson){window.exportLedgerJson(); ledgerMessage("ledgerInlineMessage","账本 JSON 备份已开始导出。");}};
+    const ledgerExportCsvBtn=document.getElementById("ledgerExportCsvBtn"); if(ledgerExportCsvBtn)ledgerExportCsvBtn.onclick=()=>{if(window.exportLedgerCsv){window.exportLedgerCsv(); ledgerMessage("ledgerInlineMessage","CSV 表格已开始导出。");}};
     const ledgerImportJsonBtn=document.getElementById("ledgerImportJsonBtn"); const ledgerImportJsonInput=document.getElementById("ledgerImportJsonInput");
     if(ledgerImportJsonBtn&&ledgerImportJsonInput)ledgerImportJsonBtn.onclick=()=>{ledgerImportJsonInput.value=""; ledgerImportJsonInput.click();};
     if(ledgerImportJsonInput)ledgerImportJsonInput.onchange=()=>{const file=ledgerImportJsonInput.files?.[0]; ledgerImportJsonInput.value=""; window.importLedgerJsonFile&&window.importLedgerJsonFile(file);};
-    const addLedgerCategoryBtn=document.getElementById("addLedgerCategoryBtn"); if(addLedgerCategoryBtn)addLedgerCategoryBtn.addEventListener("click",async()=>{if(window.saveLedgerCategoryFromForm&&await window.saveLedgerCategoryFromForm(editingLedgerCategoryId||""))editingLedgerCategoryId=null;});
-    const cancelLedgerCategoryEditBtn=document.getElementById("cancelLedgerCategoryEditBtn"); if(cancelLedgerCategoryEditBtn)cancelLedgerCategoryEditBtn.addEventListener("click",()=>{editingLedgerCategoryId=null; if(window.resetLedgerCategoryForm)window.resetLedgerCategoryForm();});
+    const addLedgerCategoryBtn=document.getElementById("addLedgerCategoryBtn"); if(addLedgerCategoryBtn)addLedgerCategoryBtn.addEventListener("click",async()=>{const wasEditing=!!editingLedgerCategoryId; if(window.saveLedgerCategoryFromForm&&await window.saveLedgerCategoryFromForm(editingLedgerCategoryId||"")){editingLedgerCategoryId=null; ledgerMessage("ledgerCategoryMessage",wasEditing?"分类已保存。":"分类已添加。");}});
+    const cancelLedgerCategoryEditBtn=document.getElementById("cancelLedgerCategoryEditBtn"); if(cancelLedgerCategoryEditBtn)cancelLedgerCategoryEditBtn.addEventListener("click",()=>{editingLedgerCategoryId=null; if(window.resetLedgerCategoryForm)window.resetLedgerCategoryForm(); ledgerMessage("ledgerCategoryMessage","已取消分类编辑。","info");});
     const ledgerCategoryTypeEl=document.getElementById("ledgerCategoryType"); if(ledgerCategoryTypeEl)ledgerCategoryTypeEl.addEventListener("change",()=>{const color=document.getElementById("ledgerCategoryColor"); if(color&&!editingLedgerCategoryId)color.value=ledgerCategoryTypeEl.value==="income"?"#16a34a":"#ef4444";});
     const ledgerCategoryList=document.getElementById("ledgerCategoryList");
     if(ledgerCategoryList)ledgerCategoryList.addEventListener("click",async e=>{
@@ -128,21 +132,23 @@
         if(!confirm("归档后不会影响已有记录，只是不再作为常用分类显示。确认归档吗？"))return;
         if(window.setLedgerCategoryArchived)await window.setLedgerCategoryArchived(id,true);
         if(editingLedgerCategoryId===id){editingLedgerCategoryId=null; if(window.resetLedgerCategoryForm)window.resetLedgerCategoryForm();}
+        ledgerMessage("ledgerCategoryMessage","分类已归档。");
         return;
       }
       if(action==="restore"){
         if(window.setLedgerCategoryArchived)await window.setLedgerCategoryArchived(id,false);
+        ledgerMessage("ledgerCategoryMessage","分类已恢复。");
       }
     });
     const ledgerBudgetMonthEl=document.getElementById("ledgerBudgetMonth"); if(ledgerBudgetMonthEl)ledgerBudgetMonthEl.addEventListener("change",()=>renderLedger());
-    const saveLedgerMonthlyBudgetBtn=document.getElementById("saveLedgerMonthlyBudgetBtn"); if(saveLedgerMonthlyBudgetBtn)saveLedgerMonthlyBudgetBtn.addEventListener("click",()=>window.saveLedgerMonthlyBudgetFromForm&&window.saveLedgerMonthlyBudgetFromForm());
-    const saveLedgerCategoryBudgetBtn=document.getElementById("saveLedgerCategoryBudgetBtn"); if(saveLedgerCategoryBudgetBtn)saveLedgerCategoryBudgetBtn.addEventListener("click",()=>window.saveLedgerCategoryBudgetFromForm&&window.saveLedgerCategoryBudgetFromForm());
+    const saveLedgerMonthlyBudgetBtn=document.getElementById("saveLedgerMonthlyBudgetBtn"); if(saveLedgerMonthlyBudgetBtn)saveLedgerMonthlyBudgetBtn.addEventListener("click",async()=>{if(window.saveLedgerMonthlyBudgetFromForm&&await window.saveLedgerMonthlyBudgetFromForm())ledgerMessage("ledgerBudgetMessage","本月总预算已保存。");});
+    const saveLedgerCategoryBudgetBtn=document.getElementById("saveLedgerCategoryBudgetBtn"); if(saveLedgerCategoryBudgetBtn)saveLedgerCategoryBudgetBtn.addEventListener("click",async()=>{if(window.saveLedgerCategoryBudgetFromForm&&await window.saveLedgerCategoryBudgetFromForm())ledgerMessage("ledgerBudgetMessage","分类预算已保存。");});
     const ledgerBudgetList=document.getElementById("ledgerBudgetList");
     if(ledgerBudgetList)ledgerBudgetList.addEventListener("click",async e=>{
       const btn=e.target.closest("[data-ledger-budget-delete]");
       if(!btn||!ledgerBudgetList.contains(btn))return;
       if(!confirm("确认删除这条预算吗？"))return;
-      if(window.deleteLedgerBudget)await window.deleteLedgerBudget(btn.dataset.ledgerBudgetDelete);
+      if(window.deleteLedgerBudget&&await window.deleteLedgerBudget(btn.dataset.ledgerBudgetDelete))ledgerMessage("ledgerBudgetMessage","预算已删除。");
     });
     document.querySelectorAll(".settings-tabs button").forEach(btn=>btn.onclick=()=>{const modal=btn.closest(".modal")||document; modal.querySelectorAll(".settings-tabs button").forEach(x=>x.classList.remove("active")); modal.querySelectorAll(".settings-panel").forEach(x=>x.classList.remove("active")); btn.classList.add("active"); document.getElementById(btn.dataset.panel).classList.add("active");});
     const settingsTermsTab=document.getElementById("settingsTermsTab"); if(settingsTermsTab)settingsTermsTab.addEventListener("click",()=>window.populateTermsSettings&&window.populateTermsSettings());

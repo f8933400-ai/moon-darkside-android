@@ -57,6 +57,33 @@ function ledgerSetText(id,value){
   if(el)el.textContent=String(value);
 }
 
+let ledgerInlineMessageTimer=null;
+function ledgerShowMessage(id,message,type="success",timeout=2600){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.textContent=String(message||"");
+  el.className=`ledger-inline-message ${type}`;
+  el.hidden=!message;
+  if(id==="ledgerInlineMessage"){
+    if(ledgerInlineMessageTimer)clearTimeout(ledgerInlineMessageTimer);
+    if(message&&timeout>0){
+      ledgerInlineMessageTimer=setTimeout(()=>{el.hidden=true;},timeout);
+    }
+  }
+}
+
+function ledgerClearMessage(id){
+  const el=document.getElementById(id);
+  if(el){el.textContent=""; el.hidden=true;}
+}
+
+function ledgerClampPercent(value){
+  const number=Number(value);
+  if(!Number.isFinite(number)||number<0)return 0;
+  if(number>100)return 100;
+  return number;
+}
+
 function ledgerCurrentSettings(){
   if(typeof normalizeLedgerSettings==="function")return normalizeLedgerSettings(typeof ledgerSettings!=="undefined"?ledgerSettings:null);
   return {categories:[],budgets:[],defaultViewMode:"month"};
@@ -115,10 +142,29 @@ function sortLedgerRecords(records){
 function syncLedgerCategoryOptions(){
   const type=document.getElementById("ledgerType")?.value==="income"?"income":"expense";
   const datalist=document.getElementById("ledgerCategoryOptions");
-  if(!datalist)return;
+  const hint=document.getElementById("ledgerCategoryHint");
+  const typeLabel=type==="income"?"收入":"支出";
   const settingsCategories=ledgerCategories(type,{includeArchived:false}).map(category=>category.name);
-  const fallback=type==="income"?LEDGER_INCOME_CATEGORIES:LEDGER_EXPENSE_CATEGORIES;
-  const values=[...new Set([...(settingsCategories.length?settingsCategories:fallback)])];
+  const values=[...new Set(settingsCategories)].filter(Boolean).sort((a,b)=>a.localeCompare(b,"zh-Hans-CN"));
+  if(datalist)datalist.innerHTML=values.map(value=>`<option value="${ledgerSafe(value)}"></option>`).join("");
+  if(hint){
+    hint.textContent=settingsCategories.length
+      ?`${typeLabel}常用分类 ${settingsCategories.length} 个，也可以直接输入新分类。`
+      :`当前没有可用的${typeLabel}常用分类，也可以直接输入分类名称。`;
+  }
+}
+
+function syncLedgerFilterCategoryOptions(){
+  const datalist=document.getElementById("ledgerFilterCategoryOptions");
+  if(!datalist)return;
+  const type=document.getElementById("ledgerTypeFilter")?.value||"all";
+  const settingsCategories=ledgerCurrentSettings().categories
+    .filter(category=>type==="all"||category.type===type)
+    .map(category=>category.name);
+  const recordCategories=normalizeLedgerRecords(ledgerRecords||[])
+    .filter(record=>type==="all"||record.type===type)
+    .map(record=>ledgerCategoryLabel(record));
+  const values=[...new Set([...settingsCategories,...recordCategories])].filter(Boolean).sort((a,b)=>a.localeCompare(b,"zh-Hans-CN"));
   datalist.innerHTML=values.map(value=>`<option value="${ledgerSafe(value)}"></option>`).join("");
 }
 
@@ -126,7 +172,9 @@ function syncLedgerBudgetCategoryOptions(){
   const select=document.getElementById("ledgerBudgetCategory");
   if(!select)return;
   const categories=ledgerCategories("expense",{includeArchived:true});
-  select.innerHTML=categories.map(category=>`<option value="${ledgerSafe(category.id)}">${ledgerSafe(category.name)}${category.archived?"（已归档）":""}</option>`).join("");
+  select.innerHTML=categories.length
+    ?categories.map(category=>`<option value="${ledgerSafe(category.id)}">${ledgerSafe(category.name)}${category.archived?"（已归档）":""}</option>`).join("")
+    :'<option value="">暂无支出分类</option>';
 }
 
 function applyLedgerDefaultViewMode(){
@@ -211,6 +259,7 @@ function populateLedgerForm(record){
   document.getElementById("ledgerPaymentMethod")&&(document.getElementById("ledgerPaymentMethod").value=normalized.paymentMethod||"");
   document.getElementById("ledgerNote")&&(document.getElementById("ledgerNote").value=normalized.note||"");
   syncLedgerCategoryOptions();
+  ledgerShowMessage("ledgerInlineMessage","正在编辑这条记录。保存后会更新原记录。","info",0);
   document.getElementById("ledgerForm")?.scrollIntoView({block:"start",behavior:"smooth"});
 }
 
@@ -226,6 +275,7 @@ function resetLedgerCategoryForm(){
   if(color)color.value="#ef4444";
   if(submit)submit.textContent="添加分类";
   if(cancel)cancel.hidden=true;
+  ledgerClearMessage("ledgerCategoryMessage");
 }
 
 function populateLedgerCategoryForm(categoryId){
@@ -241,6 +291,7 @@ function populateLedgerCategoryForm(categoryId){
   if(color)color.value=ledgerColor(category.color,category.type);
   if(submit)submit.textContent="保存分类";
   if(cancel)cancel.hidden=false;
+  ledgerShowMessage("ledgerCategoryMessage","正在编辑分类。改名不会自动修改已有记录。","info",0);
   document.getElementById("ledgerCategoryName")?.focus();
   return true;
 }
@@ -280,7 +331,6 @@ function renderLedgerCategoryList(){
   const box=document.getElementById("ledgerCategoryList");
   if(!box)return;
   const categories=[...ledgerCurrentSettings().categories].sort((a,b)=>{
-    if(a.type!==b.type)return a.type==="expense"?-1:1;
     if(a.archived!==b.archived)return a.archived?1:-1;
     return a.name.localeCompare(b.name,"zh-Hans-CN");
   });
@@ -288,8 +338,7 @@ function renderLedgerCategoryList(){
     box.innerHTML='<div class="ledger-empty compact">还没有分类。</div>';
     return;
   }
-  box.innerHTML=categories.map(category=>{
-    const typeLabel=category.type==="income"?"收入":"支出";
+  const renderItem=category=>{
     const archived=category.archived;
     const used=ledgerRecordsUseCategory(category.name);
     return `<div class="ledger-category-item ${archived?"archived":""}" data-ledger-category-id="${ledgerSafe(category.id)}">
@@ -297,7 +346,7 @@ function renderLedgerCategoryList(){
         <span class="ledger-category-color" style="background:${ledgerSafe(ledgerColor(category.color,category.type))}"></span>
         <div>
           <strong>${ledgerSafe(category.name)}</strong>
-          <small>${typeLabel}${archived?" · 已归档":""}${used?" · 已有记录":""}</small>
+          <small>${archived?"已归档":"常用分类"}${used?" · 已有记录":""}</small>
         </div>
       </div>
       <div class="ledger-record-actions">
@@ -307,6 +356,16 @@ function renderLedgerCategoryList(){
           :`<button class="light small" type="button" data-ledger-category-action="archive" data-ledger-category-id="${ledgerSafe(category.id)}">归档</button>`}
       </div>
     </div>`;
+  };
+  box.innerHTML=[
+    ["expense","支出分类"],
+    ["income","收入分类"]
+  ].map(([type,label])=>{
+    const items=categories.filter(category=>category.type===type);
+    return `<section class="ledger-category-group">
+      <div class="ledger-category-group-head"><strong>${label}</strong><span>${items.length} 个</span></div>
+      ${items.length?items.map(renderItem).join(""):'<div class="ledger-empty compact">还没有这类分类。</div>'}
+    </section>`;
   }).join("");
 }
 
@@ -351,7 +410,7 @@ function ledgerBudgetProgressPercent(spent,budget){
 }
 
 function renderLedgerProgress(spent,budget,color){
-  const percent=ledgerBudgetProgressPercent(spent,budget);
+  const percent=ledgerClampPercent(ledgerBudgetProgressPercent(spent,budget));
   return `<div class="ledger-progress" aria-hidden="true"><span class="ledger-progress-bar" style="width:${percent.toFixed(2)}%;background:${ledgerSafe(color)}"></span></div>`;
 }
 
@@ -456,7 +515,7 @@ function renderLedgerBudgetUsage(state=ledgerFilterState()){
   const box=document.getElementById("ledgerBudgetUsage");
   if(!box)return;
   if(state.mode!=="month"){
-    box.innerHTML='<div class="ledger-empty compact">切换到按月查看预算使用情况。</div>';
+    box.innerHTML='<div class="ledger-empty compact">切换到按月视图查看预算使用情况。</div>';
     return;
   }
   const month=state.month;
@@ -469,13 +528,14 @@ function renderLedgerBudgetUsage(state=ledgerFilterState()){
   const byCategory=ledgerMonthExpenseByCategory(month);
   const totalBudget=budgets.find(budget=>!ledgerText(budget.categoryName,""));
   const categoryBudgets=budgets.filter(budget=>ledgerText(budget.categoryName,""));
+  const totalPercent=totalBudget?Math.round((totalBudget.amount>0?expenseTotal/totalBudget.amount:expenseTotal>0?1:0)*100):0;
   const totalHtml=totalBudget?`<div class="ledger-budget-item featured">
     <div>
       <strong>${ledgerSafe(month)} 总预算</strong>
       <small>已用 ${ledgerMoney(expenseTotal)} / 预算 ${ledgerMoney(totalBudget.amount)} · ${ledgerBudgetStatusText(expenseTotal,totalBudget.amount)}</small>
       ${renderLedgerProgress(expenseTotal,totalBudget.amount,"#ef4444")}
     </div>
-    <strong>${totalBudget.amount>0?Math.round((expenseTotal/totalBudget.amount)*100):expenseTotal>0?100:0}%</strong>
+    <strong class="ledger-budget-percent">${totalPercent}%</strong>
   </div>`:"";
   const categoryHtml=categoryBudgets.map(budget=>{
     const spent=byCategory.get(budget.categoryName)||0;
@@ -487,10 +547,11 @@ function renderLedgerBudgetUsage(state=ledgerFilterState()){
         <small>已用 ${ledgerMoney(spent)} / 预算 ${ledgerMoney(budget.amount)} · ${ledgerBudgetStatusText(spent,budget.amount)}</small>
         ${renderLedgerProgress(spent,budget.amount,color)}
       </div>
-      <strong>${percent}%</strong>
+      <strong class="ledger-budget-percent">${percent}%</strong>
     </div>`;
   }).join("");
-  box.innerHTML=totalHtml+categoryHtml||'<div class="ledger-empty compact">还没有设置本月预算。</div>';
+  const categoryEmpty=totalBudget&&!categoryBudgets.length?'<div class="ledger-empty compact">还没有设置分类预算。</div>':"";
+  box.innerHTML=totalHtml+categoryHtml+categoryEmpty||'<div class="ledger-empty compact">还没有设置本月预算。</div>';
 }
 
 function ledgerDateRange(records){
@@ -533,6 +594,20 @@ function ledgerExpenseTitle(state=ledgerFilterState()){
   if(state.mode==="month"&&state.month===ledgerMonth())return "本月支出";
   if(state.mode==="year"&&state.year===ledgerYear())return "本年支出";
   return "支出合计";
+}
+
+function ledgerFilterTypeLabel(type){
+  if(type==="expense")return "只看支出";
+  if(type==="income")return "只看收入";
+  return "全部类型";
+}
+
+function renderLedgerFilterSummary(state,visibleCount,totalCount){
+  const box=document.getElementById("ledgerFilterSummary");
+  if(!box)return;
+  const category=state.category?`分类包含“${state.category}”`:"全部分类";
+  const status=visibleCount===0&&totalCount>0?"当前筛选没有匹配记录":`${visibleCount} 条记录`;
+  box.textContent=`当前筛选：${ledgerViewTitle(state)} · ${ledgerFilterTypeLabel(state.type)} · ${category} · ${status}`;
 }
 
 function ledgerMatchesView(record,state){
@@ -582,7 +657,7 @@ function renderLedgerCategoryRows(rows,emptyText,type="expense"){
   const max=Math.max(...rows.map(row=>Number(row.amount)||0),0);
   return `<div class="ledger-chart-list">${rows.map(row=>{
     const amount=Number(row.amount)||0;
-    const percent=max>0?Math.max(4,(amount/max)*100):0;
+    const percent=max>0?ledgerClampPercent(Math.max(4,(amount/max)*100)):0;
     const color=ledgerCategoryColor(type,row.label)||ledgerColor("",type);
     return `<div class="ledger-chart-row">
       <div class="ledger-chart-head">
@@ -599,8 +674,12 @@ function renderLedgerAccountRows(rows){
   return rows.map(row=>`<div class="ledger-summary-row ledger-account-row"><span>${ledgerSafe(row.label)}<small>支出 ${ledgerMoney(row.expense)} / 收入 ${ledgerMoney(row.income)}</small></span><strong>${ledgerMoney(row.balance)}</strong></div>`).join("");
 }
 
-function renderLedgerRecords(records){
-  if(!records.length)return '<div class="ledger-empty">当前筛选下还没有收支记录。</div>';
+function renderLedgerRecords(records,totalCount=normalizeLedgerRecords(ledgerRecords||[]).length){
+  if(!records.length){
+    return totalCount
+      ?'<div class="ledger-empty">当前筛选没有匹配记录。</div>'
+      :'<div class="ledger-empty">还没有记录，先添加一笔收支。</div>';
+  }
   const visible=records.slice(0,LEDGER_LIST_LIMIT);
   return visible.map(record=>{
     const typeLabel=record.type==="income"?"收入":"支出";
@@ -769,6 +848,7 @@ async function importLedgerJsonFile(file){
     if(typeof resetLedgerCategoryForm==="function")resetLedgerCategoryForm();
     renderLedger();
     alert("账本备份已导入。");
+    ledgerShowMessage("ledgerInlineMessage","账本备份已导入。","success");
     return true;
   }catch(err){
     console.warn("importLedgerJsonFile failed",err);
@@ -787,9 +867,11 @@ function renderLedger(){
   setLedgerInitialInputValues(false);
   syncLedgerFilterControls();
   syncLedgerCategoryOptions();
+  syncLedgerFilterCategoryOptions();
   syncLedgerBudgetCategoryOptions();
   const state=ledgerFilterState();
-  const records=ledgerFilteredRecords(ledgerRecords||[],state);
+  const allRecords=normalizeLedgerRecords(ledgerRecords||[]);
+  const records=ledgerFilteredRecords(allRecords,state);
   const totals=ledgerTotals(records);
   const title=ledgerViewTitle(state);
   ledgerSetText("ledgerHeaderSubtitle",title);
@@ -807,8 +889,9 @@ function renderLedger(){
   if(expenseBox)expenseBox.innerHTML=renderLedgerCategoryRows(ledgerGroupByCategory(records,"expense"),"当前筛选下没有支出记录","expense");
   if(incomeBox)incomeBox.innerHTML=renderLedgerCategoryRows(ledgerGroupByCategory(records,"income"),"当前筛选下没有收入记录","income");
   if(accountBox)accountBox.innerHTML=renderLedgerAccountRows(ledgerGroupByAccount(records));
+  renderLedgerFilterSummary(state,records.length,allRecords.length);
   if(note)note.textContent=records.length>LEDGER_LIST_LIMIT?"记录较多，仅显示最近 200 条。":"按日期倒序排列。";
-  if(list)list.innerHTML=renderLedgerRecords(records);
+  if(list)list.innerHTML=renderLedgerRecords(records,allRecords.length);
   renderLedgerCategoryList();
   renderLedgerBudgetControls();
   renderLedgerBudgetUsage(state);
@@ -825,8 +908,10 @@ window.previewLedgerImport=previewLedgerImport;
 window.exportLedgerJson=exportLedgerJson;
 window.exportLedgerCsv=exportLedgerCsv;
 window.importLedgerJsonFile=importLedgerJsonFile;
+window.ledgerShowMessage=ledgerShowMessage;
 window.setLedgerInitialInputValues=setLedgerInitialInputValues;
 window.syncLedgerCategoryOptions=syncLedgerCategoryOptions;
+window.syncLedgerFilterCategoryOptions=syncLedgerFilterCategoryOptions;
 window.syncLedgerBudgetCategoryOptions=syncLedgerBudgetCategoryOptions;
 window.applyLedgerDefaultViewMode=applyLedgerDefaultViewMode;
 window.syncLedgerFilterControls=syncLedgerFilterControls;
