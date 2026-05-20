@@ -75,6 +75,17 @@ P4-04 打磨本地账本首页的日常可用性：
 - 移动端表单、按钮、分类名、备注和条形图继续避免横向溢出。
 - 主记录 JSON / encrypted-json 仍不包含 `ledgerRecords` 或 `ledgerSettings`。
 
+## P4-05 账本与记录层隔离验收
+
+P4-05 完成账本隔离验收：
+
+- 确认主记录 JSON / encrypted-json 不包含账本记录或账本设置。
+- 确认主记录导入不会覆盖当前账本，旧版含 `ledgerRecords` 的主备份也不会自动恢复到账本。
+- 确认账本 JSON v2 只包含 `records` 和 `settings`，不包含主记录数据、偏好、图片或 `messageIntegrity`。
+- 确认账本 JSON v1 导入只替换 records 并保留当前 settings，v2 导入替换 records + settings。
+- 确认坏 settings 导入失败且尽量保留当前账本。
+- 确认 CSV 只导出账本记录，存储健康面板只显示账本大小和数量统计，不泄露账本明细。
+
 ## P0-P2 已完成功能
 
 P0 阶段：
