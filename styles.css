@@ -363,6 +363,28 @@
     .backup-health-result.warn, .backup-health-file.warn { border-style:solid; border-color:#fde68a; background:#fffbeb; color:#92400e; }
     .backup-health-result.error, .backup-health-file.error { border-style:solid; border-color:#fecaca; background:#fef2f2; color:#991b1b; }
     .backup-health-note { margin-top:12px; padding:9px 10px; border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; color:#1d4ed8; font-size:12px; line-height:1.5; }
+    .storage-health-modal { width:min(820px,100%); max-height:min(92dvh,860px); }
+    .storage-health-section { display:grid; gap:10px; margin-top:12px; padding:12px; border:1px solid #e5e7eb; border-radius:8px; background:#fafbfc; }
+    .storage-health-section h3 { margin:0; font-size:14px; color:#111827; }
+    .storage-health-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .storage-health-stat { min-width:0; padding:10px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; }
+    .storage-health-stat span { display:block; color:#6b7280; font-size:12px; line-height:1.45; }
+    .storage-health-stat strong { display:block; margin-top:4px; color:#111827; font-size:18px; line-height:1.3; word-break:break-word; }
+    .storage-health-stat small { display:block; margin-top:4px; color:#6b7280; font-size:11px; line-height:1.45; word-break:break-word; }
+    .storage-health-risk, .storage-health-advice { min-height:42px; padding:10px; border:1px solid #d1d5db; border-radius:8px; background:#fff; color:#4b5563; font-size:13px; line-height:1.6; word-break:break-word; }
+    .storage-health-risk strong { display:block; color:#111827; font-size:16px; line-height:1.35; }
+    .storage-health-risk span, .storage-health-risk small { display:block; color:#6b7280; font-size:12px; line-height:1.5; }
+    .storage-health-risk p, .storage-health-advice p { margin:6px 0 0; }
+    .storage-health-advice p:first-child { margin-top:0; }
+    .storage-health-risk.ok { border-color:#bbf7d0; background:#ecfdf5; color:#065f46; }
+    .storage-health-risk.ok strong, .storage-health-risk.ok span, .storage-health-risk.ok small { color:#065f46; }
+    .storage-health-risk.warn { border-color:#fde68a; background:#fffbeb; color:#92400e; }
+    .storage-health-risk.warn strong, .storage-health-risk.warn span, .storage-health-risk.warn small { color:#92400e; }
+    .storage-health-risk.danger { border-color:#fecaca; background:#fef2f2; color:#991b1b; }
+    .storage-health-risk.danger strong, .storage-health-risk.danger span, .storage-health-risk.danger small { color:#991b1b; }
+    .storage-health-actions { display:flex; flex-wrap:wrap; gap:8px; }
+    .storage-health-actions button { flex:1 1 170px; min-width:0; }
+    .storage-health-note { margin-top:12px; padding:9px 10px; border:1px solid #bfdbfe; border-radius:8px; background:#eff6ff; color:#1d4ed8; font-size:12px; line-height:1.5; }
     .system-grid { display:grid; gap:12px; }
     .system-card, .system-group, .system-member-card, .relation-card { border:1px solid #e5e7eb; border-radius:12px; background:#fff; padding:10px; }
     .system-card p, .relation-card p { margin:6px 0 0; color:#4b5563; line-height:1.6; white-space:pre-wrap; }
@@ -520,13 +542,19 @@
     body.dark .settings-tabs button.active { background:#e5e7eb; color:#111827; border-color:#e5e7eb; }
     body.dark .terms-note { background:#172554; border-color:#1d4ed8; color:#bfdbfe; }
     body.dark .term-input-row { color:#9ca3af; }
-    body.dark .backup-health-entry, body.dark .backup-health-section, body.dark .backup-health-stat, body.dark .backup-health-result, body.dark .backup-health-file { background:#111827; border-color:#4b5563; color:#d1d5db; }
-    body.dark .backup-health-entry span, body.dark .backup-health-stat span, body.dark .backup-health-stat small { color:#9ca3af; }
-    body.dark .backup-health-section h3, body.dark .backup-health-stat strong { color:#e5e7eb; }
+    body.dark .backup-health-entry, body.dark .backup-health-section, body.dark .backup-health-stat, body.dark .backup-health-result, body.dark .backup-health-file, body.dark .storage-health-section, body.dark .storage-health-stat, body.dark .storage-health-advice { background:#111827; border-color:#4b5563; color:#d1d5db; }
+    body.dark .backup-health-entry span, body.dark .backup-health-stat span, body.dark .backup-health-stat small, body.dark .storage-health-stat span, body.dark .storage-health-stat small, body.dark .storage-health-risk span, body.dark .storage-health-risk small { color:#9ca3af; }
+    body.dark .backup-health-section h3, body.dark .backup-health-stat strong, body.dark .storage-health-section h3, body.dark .storage-health-stat strong, body.dark .storage-health-risk strong { color:#e5e7eb; }
     body.dark .backup-health-result.ok, body.dark .backup-health-file.ok { background:#052e16; border-color:#166534; color:#bbf7d0; }
     body.dark .backup-health-result.warn, body.dark .backup-health-file.warn { background:#451a03; border-color:#92400e; color:#fde68a; }
     body.dark .backup-health-result.error, body.dark .backup-health-file.error { background:#450a0a; border-color:#7f1d1d; color:#fecaca; }
-    body.dark .backup-health-note { background:#172554; border-color:#1d4ed8; color:#bfdbfe; }
+    body.dark .backup-health-note, body.dark .storage-health-note { background:#172554; border-color:#1d4ed8; color:#bfdbfe; }
+    body.dark .storage-health-risk.ok { background:#052e16; border-color:#166534; color:#bbf7d0; }
+    body.dark .storage-health-risk.ok strong, body.dark .storage-health-risk.ok span, body.dark .storage-health-risk.ok small { color:#bbf7d0; }
+    body.dark .storage-health-risk.warn { background:#451a03; border-color:#92400e; color:#fde68a; }
+    body.dark .storage-health-risk.warn strong, body.dark .storage-health-risk.warn span, body.dark .storage-health-risk.warn small { color:#fde68a; }
+    body.dark .storage-health-risk.danger { background:#450a0a; border-color:#7f1d1d; color:#fecaca; }
+    body.dark .storage-health-risk.danger strong, body.dark .storage-health-risk.danger span, body.dark .storage-health-risk.danger small { color:#fecaca; }
     body.dark .system-card, body.dark .system-group, body.dark .system-member-card, body.dark .relation-card { background:#1f2937; border-color:#4b5563; }
     body.dark .system-card p, body.dark .relation-card p { color:#d1d5db; }
     body.dark .system-members { border-color:#4b5563; }
@@ -562,9 +590,9 @@
       .terms-actions button { flex:1 1 100%; min-width:0; }
       .backup-health-entry { grid-template-columns:1fr; align-items:stretch; }
       .backup-health-entry button { width:100%; white-space:normal; }
-      .backup-health-summary { grid-template-columns:1fr; }
-      .backup-health-actions { display:grid; grid-template-columns:1fr; }
-      .backup-health-actions button { width:100%; }
+      .backup-health-summary, .storage-health-grid { grid-template-columns:1fr; }
+      .backup-health-actions, .storage-health-actions { display:grid; grid-template-columns:1fr; }
+      .backup-health-actions button, .storage-health-actions button { width:100%; }
       .messages { padding:12px; }
       .bubble-wrap { max-width:82%; }
       .composer { padding:10px max(12px,env(safe-area-inset-right)) calc(26px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); box-shadow:0 -1px 0 rgba(17,24,39,.04); }
