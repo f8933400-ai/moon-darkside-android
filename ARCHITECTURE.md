@@ -13,6 +13,7 @@
 `index.html` 当前脚本加载顺序如下。这里省略 cache-busting query 参数，只保留实际文件路径；依赖关系以这个顺序为准：
 
 ```html
+<script src="js/sw-register.js"></script>
 <script src="js/data.js"></script>
 <script src="js/features/terms.js"></script>
 <script src="js/imageStore.js"></script>
@@ -22,6 +23,7 @@
 <script src="js/imageMigration.js"></script>
 <script src="js/imageHealth.js"></script>
 <script src="js/features/backup-health-ui.js"></script>
+<script src="js/features/storage-health.js"></script>
 <script src="js/render.js"></script>
 <script src="js/features/members.js"></script>
 <script src="js/features/rooms.js"></script>
@@ -42,6 +44,7 @@
 
 主要职责：
 
+- `js/sw-register.js`：按协议注册 PWA Service Worker；`file://` 下跳过。
 - `js/data.js`：常量、localStorage 键名、默认偏好、初始数据、基础工具。
 - `js/features/terms.js`：自定义术语系统，提供 `term()`、设置面板填充与静态文案刷新。
 - `js/imageStore.js`：IndexedDB 图片存储封装，暴露 `window.imageStore`。
@@ -51,9 +54,25 @@
 - `js/imageMigration.js`：旧 DataURL 图片外置到 IndexedDB 的控制台维护工具。
 - `js/imageHealth.js`：图片健康检查、孤儿图片清理、从 JSON 备份修复缺失图片的控制台 API。
 - `js/features/backup-health-ui.js`：备份健康检查 UI，调用 `imageHealth.js` 现有 API。
+- `js/features/storage-health.js`：本地存储状态面板，展示主数据、图片和账本的体积 / 数量统计。
 - `js/render.js`：偏好应用、侧栏、聊天、结构视图、系统资料、系统名片等渲染。
 - `js/features/*.js`：各功能模块。
 - `js/app.js`：全局 UI 状态、事件绑定、启动流程、自动图片迁移触发。
+
+### PWA / Service Worker 边界
+
+PWA 支持由 `js/sw-register.js`、`sw.js` 和 `manifest.webmanifest` 组成。
+
+- `js/sw-register.js` 只在 `https:` 或本机 `http://localhost` / `127.0.0.1` / `[::1]` 下注册 Service Worker。
+- `file://` 下会跳过 Service Worker。页面仍可直接打开，但没有 PWA 离线壳缓存。
+- `sw.js` 的缓存名为 `moon-app-shell-p5-04-v0.4.0`。
+- `APP_SHELL` 只包含静态应用壳：入口 HTML、样式、manifest、favicon、本地图标和 `index.html` 直接加载的普通 `js/` 脚本。
+- fetch handler 只响应同源 `GET` 且 pathname 命中 `APP_SHELL_PATHS` 的 http / https 请求。
+- Service Worker 不缓存用户导出的 `.json`、`.moonenc.json`、账本 JSON、CSV、图片 Blob、IndexedDB 内容或 localStorage 内容。
+- install 阶段完成 app shell 缓存后会 `skipWaiting()`；activate 阶段会清理旧的 `moon-app-shell-*` 缓存并 `clients.claim()`。
+- `manifest.webmanifest` 使用 standalone 显示模式，并引用 128 / 192 / 512 本地图标。
+
+Cache Storage 与用户数据存储边界必须保持分离：Cache Storage 只服务静态 app shell，主记录、账本和图片仍分别由 localStorage 与 IndexedDB 管理。
 
 ## 3. 全局状态
 

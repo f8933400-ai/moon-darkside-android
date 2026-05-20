@@ -1,4 +1,4 @@
-const CACHE_NAME = "moon-app-shell-v0.3.1";
+const CACHE_NAME = "moon-app-shell-p5-04-v0.4.0";
 
 const APP_SHELL = [
   "./",
@@ -6,6 +6,8 @@ const APP_SHELL = [
   "./styles.css",
   "./manifest.webmanifest",
   "./app_icon.png",
+  "./app_icon_192.png",
+  "./app_icon_512.png",
   "./favicon.ico",
   "./js/data.js",
   "./js/features/terms.js",
@@ -83,6 +85,7 @@ self.addEventListener("install", function(event){
       return cache.addAll(APP_SHELL);
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", function(event){
@@ -94,6 +97,8 @@ self.addEventListener("activate", function(event){
         }
         return undefined;
       }));
+    }).then(function(){
+      return self.clients.claim();
     })
   );
 });

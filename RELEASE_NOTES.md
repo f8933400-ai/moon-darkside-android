@@ -130,6 +130,19 @@ P5-03 完成图片备份、恢复、hydrate 和 externalize 链路验收：
 - 确认 `imageHealth` 能发现缺失引用、孤儿图片，并能从完整 JSON 备份修复缺失图片。
 - 本轮未发现阻断 bug，没有业务代码改动，没有新增依赖、联网请求、构建步骤或 `type="module"`。
 
+## P5-04 PWA 离线缓存与本地稳定包验收
+
+P5-04 完成 PWA 离线缓存和本地稳定包前置验收：
+
+- 新增 `P5-04_PWA_OFFLINE_STABLE_ACCEPTANCE.md`，记录 Service Worker 注册、app shell 缓存、离线刷新、manifest、图标和不缓存用户数据的验收结果。
+- 将 Service Worker 缓存名更新为 `moon-app-shell-p5-04-v0.4.0`，避免继续停留在旧 app shell 缓存版本。
+- Service Worker 仍只缓存静态 app shell，并在 activate 阶段清理旧 `moon-app-shell-*` 缓存；本轮没有改成缓存所有请求。
+- manifest 新增 192 / 512 本地图标，`APP_SHELL` 同步缓存这些静态图标。
+- 验收确认导出的主 JSON、encrypted-json、账本 JSON、CSV、图片 Blob、IndexedDB 和 localStorage 不进入 Service Worker Cache Storage。
+- `file://` 下继续安全跳过 Service Worker；localhost / HTTPS 条件下可注册。
+- 主 JSON / encrypted-json 仍不包含 `ledgerRecords` 或 `ledgerSettings`；图片备份 / 恢复语义和账本隔离语义未受影响。
+- 没有新增依赖、联网请求、构建步骤或 `type="module"`。
+
 ## P0-P2 已完成功能
 
 P0 阶段：
