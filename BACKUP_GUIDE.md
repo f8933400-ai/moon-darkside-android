@@ -20,7 +20,7 @@
 
 PWA 安装是可选的，只负责让应用更方便地启动，并通过 Service Worker 缓存静态应用文件。它不是云同步，也不会把用户数据上传到任何地方。
 
-Service Worker 不缓存完整 JSON 备份、`.moonenc.json` 加密备份、账本 JSON、CSV、图片 Blob、IndexedDB 内容或 `localStorage` 内容。当前数据仍保存在当前浏览器的 `localStorage` + IndexedDB 中；一旦清理站点数据、更换浏览器或更换设备，仍需要依靠完整 JSON 备份或加密备份恢复。
+Service Worker 不缓存完整 JSON 备份、`.moonenc.json` 加密备份、账本 JSON、CSV、图片 Blob、IndexedDB 内容或 `localStorage` 内容。它只缓存静态 app shell 和本地脚本；当前数据仍保存在当前浏览器的 `localStorage` + IndexedDB 中。一旦清理站点数据、更换浏览器或更换设备，仍需要依靠完整 JSON 备份或加密备份恢复。
 
 因此，PWA 不替代备份流程。v0.4.0 local stable 的静态壳缓存版本是 `moon-app-shell-v0.4.0`，并包含 128 / 192 / 512 本地图标；更新 app 文件后，如果看到旧界面，可以刷新页面，或清理此站点缓存 / Service Worker 后重新打开。直接用 `file://` 打开时，Service Worker 不可用；需要 PWA 缓存能力时，请使用本机 HTTP 或可信的 HTTPS 本地 / 私有静态服务。
 

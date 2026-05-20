@@ -33,6 +33,8 @@
 <script src="js/features/tasks.js"></script>
 <script src="js/features/care.js"></script>
 <script src="js/features/fronting.js"></script>
+<script src="js/vendor/qrcode-generator.js"></script>
+<script src="js/vendor/jsqr.js"></script>
 <script src="js/features/system-card.js"></script>
 <script src="js/features/ledger.js"></script>
 <script src="js/features/import-export.js"></script>
@@ -56,6 +58,7 @@
 - `js/features/backup-health-ui.js`：备份健康检查 UI，调用 `imageHealth.js` 现有 API。
 - `js/features/storage-health.js`：本地存储状态面板，展示主数据、图片和账本的体积 / 数量统计。
 - `js/render.js`：偏好应用、侧栏、聊天、结构视图、系统资料、系统名片等渲染。
+- `js/vendor/qrcode-generator.js`、`js/vendor/jsqr.js`：系统名片 QR 生成 / 识别的本地 vendor 脚本，普通 script 顺序加载，不通过 eval 风格运行。
 - `js/features/*.js`：各功能模块。
 - `js/app.js`：全局 UI 状态、事件绑定、启动流程、自动图片迁移触发。
 
@@ -68,6 +71,7 @@ PWA 支持由 `js/sw-register.js`、`sw.js` 和 `manifest.webmanifest` 组成。
 - `sw.js` 的缓存名为 `moon-app-shell-v0.4.0`。
 - `APP_SHELL` 只包含静态应用壳：入口 HTML、样式、manifest、favicon、本地图标和 `index.html` 直接加载的普通 `js/` 脚本。
 - fetch handler 只响应同源 `GET` 且 pathname 命中 `APP_SHELL_PATHS` 的 http / https 请求。
+- app shell 命中缓存时会返回旧缓存并后台刷新；无缓存时会尝试 fetch，失败后回退到入口 app shell，不向 `respondWith()` 返回 undefined。
 - Service Worker 不缓存用户导出的 `.json`、`.moonenc.json`、账本 JSON、CSV、图片 Blob、IndexedDB 内容或 localStorage 内容。
 - install 阶段完成 app shell 缓存后会 `skipWaiting()`；activate 阶段会清理旧的 `moon-app-shell-*` 缓存并 `clients.claim()`。
 - `manifest.webmanifest` 使用 standalone 显示模式，并引用 128 / 192 / 512 本地图标。
@@ -248,6 +252,8 @@ ID 命名规则：
 - `clearImageCache()`
 - `selfTest()`
 
+`getImageUrl()` 使用 ObjectURL LRU 缓存，当前上限为 120；命中时刷新最近使用顺序，超过上限会 revoke 最旧 URL。`putImage()`、`deleteImage()` 和 `clearImageCache()` 会释放对应缓存 URL。`dataUrlToBlob()` 支持带 charset / name 参数的 data URL，也支持 UTF-8 非 base64 内容。
+
 运行时新写入图片仍进入 IndexedDB，主 `data` 只长期保存 `imageId/avatarId/backgroundId`，不长期写 DataURL。
 
 ## 8. 图片导入导出语义
@@ -326,7 +332,7 @@ P5-03 验收确认完整 JSON / encrypted-json 能恢复成员头像、房间背
 5. `ledgerSettings = await loadLedgerSettings()`
 6. `currentRoomId = data.rooms[0]?.id || "main"`
 7. `appMode = prefs.resetToCover===false ? (prefs.lastAppMode || "cover") : "cover"`
-8. `await closeDuePolls()`
+8. 如果 `appMode === "journal"`，执行 `await closeDuePolls()`
 9. `await runAutoImageMigrationIfNeeded()`
 10. `applyLedgerDefaultViewMode()`
 11. `applyPrefs()`
@@ -350,13 +356,13 @@ P0-P2 当前模块包括：
 - 高级搜索：内存聚合搜索消息、成员扩展字段、房间、交接、投票、前台、任务；支持跳转和消息高亮。
 - 投票升级为议题 / 决议 / 复盘：议题说明、投票理由、暂停 / 恢复 / 取消、决议文本、复盘时间。
 - 公开资料分级 / 隐私桶：`systemProfileVisibility` 控制应用内展示和脱敏导出，不是加密隔离。
-- 系统名片：默认只包含可公开字段；可保存外部系统名片，不合并到本系统资料。
+- 系统名片：默认只包含可公开字段；可保存外部系统名片，不合并到本系统资料；QR 生成 / 识别依赖本地 vendor 脚本，不联网。
 - 身体照护板 / 需求看板：照护记录、照护清单，可选写入聊天 `kind="状态"`。
 - 备份健康检查 UI：检查图片引用、缺失图片、孤儿图片；修复和清理前均需确认。
 - 自定义术语系统：自定义成员、系统、前台、交接、任务、照护、接续等界面词。
 - 时间线总览 + 月度回顾：只读聚合消息、前台、交接、议题、任务、照护；不聚合账本、不读图片 Blob、不修改 `data`。
 - 复盘报告导出：Markdown / TXT，只读生成；支持日期范围、章节开关、脱敏、排除私聊、隐藏成员名。
-- 本地账本首页：账本记录存放在 `LEDGER_KEY`，账本分类和预算设置存放在 `LEDGER_SETTINGS_KEY`，与主记录完整备份隔离；首页提供收支 CRUD、分类管理、月度总预算、分类预算、日 / 月 / 年 / 全部统计、CSS 条形图、筛选摘要、空态提示、操作反馈、账本 JSON / CSV 导出和账本 JSON 替换导入。
+- 本地账本首页：账本记录存放在 `LEDGER_KEY`，账本分类和预算设置存放在 `LEDGER_SETTINGS_KEY`，与主记录完整备份隔离；首页提供收支 CRUD、分类管理、月度总预算、分类预算、日 / 月 / 年 / 全部统计、CSS 条形图、筛选摘要、空态提示、操作反馈、账本 JSON / CSV 导出和账本 JSON 替换导入。金额存储结构保持原样，统计和预算计算内部按 cents 整数处理后再格式化展示。
 
 ## 12. 导入导出
 

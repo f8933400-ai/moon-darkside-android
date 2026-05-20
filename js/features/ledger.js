@@ -37,9 +37,22 @@ function ledgerYear(){
   return ledgerToday().slice(0,4);
 }
 
-function ledgerMoney(value){
+function ledgerAmountToCents(value){
   const amount=Number(value);
-  return (Number.isFinite(amount)?amount:0).toFixed(2);
+  return Number.isFinite(amount)?Math.round(amount*100):0;
+}
+
+function ledgerCentsToAmount(cents){
+  const value=Number(cents);
+  return (Number.isFinite(value)?value:0)/100;
+}
+
+function ledgerMoneyFromCents(cents){
+  return ledgerCentsToAmount(cents).toFixed(2);
+}
+
+function ledgerMoney(value){
+  return ledgerMoneyFromCents(ledgerAmountToCents(value));
 }
 
 function ledgerText(value,fallback=""){
@@ -397,16 +410,16 @@ function ledgerMonthExpenseByCategory(month){
   const totals=new Map();
   ledgerMonthExpenseRecords(month).forEach(record=>{
     const category=ledgerCategoryLabel(record);
-    totals.set(category,(totals.get(category)||0)+(Number(record.amount)||0));
+    totals.set(category,(totals.get(category)||0)+ledgerAmountToCents(record.amount));
   });
   return totals;
 }
 
 function ledgerBudgetProgressPercent(spent,budget){
-  const amount=Number(budget)||0;
-  const used=Number(spent)||0;
-  if(amount<=0)return used>0?100:0;
-  return Math.min(100,Math.max(0,(used/amount)*100));
+  const budgetCents=ledgerAmountToCents(budget);
+  const spentCents=ledgerAmountToCents(spent);
+  if(budgetCents<=0)return spentCents>0?100:0;
+  return Math.min(100,Math.max(0,(spentCents/budgetCents)*100));
 }
 
 function renderLedgerProgress(spent,budget,color){
@@ -415,9 +428,9 @@ function renderLedgerProgress(spent,budget,color){
 }
 
 function ledgerBudgetStatusText(spent,budget){
-  const remaining=(Number(budget)||0)-(Number(spent)||0);
-  if(remaining<0)return `已超出 ${ledgerMoney(Math.abs(remaining))} 元`;
-  return `剩余额度 ${ledgerMoney(remaining)} 元`;
+  const remainingCents=ledgerAmountToCents(budget)-ledgerAmountToCents(spent);
+  if(remainingCents<0)return `已超出 ${ledgerMoneyFromCents(Math.abs(remainingCents))} 元`;
+  return `剩余额度 ${ledgerMoneyFromCents(remainingCents)} 元`;
 }
 
 async function upsertLedgerBudget(month,categoryName,amount,categoryId=""){
@@ -528,7 +541,7 @@ function renderLedgerBudgetUsage(state=ledgerFilterState()){
   const byCategory=ledgerMonthExpenseByCategory(month);
   const totalBudget=budgets.find(budget=>!ledgerText(budget.categoryName,""));
   const categoryBudgets=budgets.filter(budget=>ledgerText(budget.categoryName,""));
-  const totalPercent=totalBudget?Math.round((totalBudget.amount>0?expenseTotal/totalBudget.amount:expenseTotal>0?1:0)*100):0;
+  const totalPercent=totalBudget?Math.round(ledgerBudgetProgressPercent(expenseTotal,totalBudget.amount)):0;
   const totalHtml=totalBudget?`<div class="ledger-budget-item featured">
     <div>
       <strong>${ledgerSafe(month)} 总预算</strong>
@@ -538,9 +551,9 @@ function renderLedgerBudgetUsage(state=ledgerFilterState()){
     <strong class="ledger-budget-percent">${totalPercent}%</strong>
   </div>`:"";
   const categoryHtml=categoryBudgets.map(budget=>{
-    const spent=byCategory.get(budget.categoryName)||0;
+    const spent=ledgerCentsToAmount(byCategory.get(budget.categoryName)||0);
     const color=ledgerCategoryColor("expense",budget.categoryName)||"#ef4444";
-    const percent=budget.amount>0?Math.round((spent/budget.amount)*100):spent>0?100:0;
+    const percent=Math.round(ledgerBudgetProgressPercent(spent,budget.amount));
     return `<div class="ledger-budget-item">
       <div>
         <strong>${ledgerSafe(budget.categoryName)}</strong>
@@ -561,12 +574,13 @@ function ledgerDateRange(records){
 }
 
 function ledgerTotals(records){
-  return normalizeLedgerRecords(records).reduce((totals,record)=>{
-    const amount=Number(record.amount)||0;
-    if(record.type==="income")totals.income+=amount;
-    else totals.expense+=amount;
+  const cents=normalizeLedgerRecords(records).reduce((totals,record)=>{
+    const amountCents=ledgerAmountToCents(record.amount);
+    if(record.type==="income")totals.incomeCents+=amountCents;
+    else totals.expenseCents+=amountCents;
     return totals;
-  },{income:0,expense:0});
+  },{incomeCents:0,expenseCents:0});
+  return {income:ledgerCentsToAmount(cents.incomeCents),expense:ledgerCentsToAmount(cents.expenseCents),incomeCents:cents.incomeCents,expenseCents:cents.expenseCents};
 }
 
 function ledgerFilterState(){
@@ -634,35 +648,42 @@ function ledgerGroupByCategory(records,type){
   normalizeLedgerRecords(records).forEach(record=>{
     if(record.type!==type)return;
     const key=ledgerCategoryLabel(record);
-    totals.set(key,(totals.get(key)||0)+(Number(record.amount)||0));
+    totals.set(key,(totals.get(key)||0)+ledgerAmountToCents(record.amount));
   });
-  return [...totals.entries()].map(([label,amount])=>({label,amount})).sort((a,b)=>b.amount-a.amount||a.label.localeCompare(b.label,"zh-Hans-CN"));
+  return [...totals.entries()].map(([label,cents])=>({label,cents,amount:ledgerCentsToAmount(cents)})).sort((a,b)=>b.cents-a.cents||a.label.localeCompare(b.label,"zh-Hans-CN"));
 }
 
 function ledgerGroupByAccount(records){
   const totals=new Map();
   normalizeLedgerRecords(records).forEach(record=>{
     const key=ledgerAccountLabel(record);
-    const row=totals.get(key)||{label:key,income:0,expense:0};
-    const amount=Number(record.amount)||0;
-    if(record.type==="income")row.income+=amount;
-    else row.expense+=amount;
+    const row=totals.get(key)||{label:key,incomeCents:0,expenseCents:0};
+    const amountCents=ledgerAmountToCents(record.amount);
+    if(record.type==="income")row.incomeCents+=amountCents;
+    else row.expenseCents+=amountCents;
     totals.set(key,row);
   });
-  return [...totals.values()].map(row=>({...row,balance:row.income-row.expense,total:row.income+row.expense})).sort((a,b)=>b.total-a.total||a.label.localeCompare(b.label,"zh-Hans-CN"));
+  return [...totals.values()].map(row=>({
+    ...row,
+    income:ledgerCentsToAmount(row.incomeCents),
+    expense:ledgerCentsToAmount(row.expenseCents),
+    balance:ledgerCentsToAmount(row.incomeCents-row.expenseCents),
+    total:ledgerCentsToAmount(row.incomeCents+row.expenseCents),
+    totalCents:row.incomeCents+row.expenseCents
+  })).sort((a,b)=>b.totalCents-a.totalCents||a.label.localeCompare(b.label,"zh-Hans-CN"));
 }
 
 function renderLedgerCategoryRows(rows,emptyText,type="expense"){
   if(!rows.length)return `<div class="ledger-empty compact">${ledgerSafe(emptyText)}</div>`;
-  const max=Math.max(...rows.map(row=>Number(row.amount)||0),0);
+  const maxCents=Math.max(...rows.map(row=>Number(row.cents)||ledgerAmountToCents(row.amount)),0);
   return `<div class="ledger-chart-list">${rows.map(row=>{
-    const amount=Number(row.amount)||0;
-    const percent=max>0?ledgerClampPercent(Math.max(4,(amount/max)*100)):0;
+    const cents=Number(row.cents)||ledgerAmountToCents(row.amount);
+    const percent=maxCents>0?ledgerClampPercent(Math.max(4,(cents/maxCents)*100)):0;
     const color=ledgerCategoryColor(type,row.label)||ledgerColor("",type);
     return `<div class="ledger-chart-row">
       <div class="ledger-chart-head">
         <span><i class="ledger-category-color" style="background:${ledgerSafe(color)}"></i>${ledgerSafe(row.label)}</span>
-        <strong>${ledgerMoney(amount)}</strong>
+        <strong>${ledgerMoneyFromCents(cents)}</strong>
       </div>
       <div class="ledger-chart-track" aria-hidden="true"><span class="ledger-chart-bar" style="width:${percent.toFixed(2)}%;background:${ledgerSafe(color)}"></span></div>
     </div>`;
@@ -727,8 +748,8 @@ function previewLedgerImport(records,settings=ledgerCurrentSettings(),hasSetting
     text:[
       `记录数量：${normalized.length}`,
       `日期范围：${range.label}`,
-      `总收入：${totals.income.toFixed(2)}`,
-      `总支出：${totals.expense.toFixed(2)}`,
+      `总收入：${ledgerMoney(totals.income)}`,
+      `总支出：${ledgerMoney(totals.expense)}`,
       `分类数量：${normalizedSettings.categories.length}`,
       `预算数量：${normalizedSettings.budgets.length}`,
       importMode

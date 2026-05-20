@@ -1,5 +1,18 @@
 # 发布说明
 
+## P6-02 低风险维护修复与封包前回归
+
+P6-02 继续暂停 Android APK / macOS DMG / iOS IPA 试制，收束代码审查中剩余的中低风险维护问题：
+
+- 整理 Service Worker app shell stale-while-revalidate 边角行为，避免无缓存且刷新失败时返回不明确结果。
+- `dataUrlToBlob` 支持带 charset / name 参数的 data URL 和 UTF-8 非 base64 内容。
+- IndexedDB 图片 ObjectURL cache 增加 LRU 上限和释放，删除图片或清空缓存时同步 revoke。
+- 账本统计、分类汇总、账户汇总和预算判断改用 cents 整数计算，避免 `0.1 + 0.2` 这类浮点边界误差。
+- 系统名片 QR 生成 / 识别库从 `system-card.js` 内嵌 `Function(atob(...))` 拆为普通本地 vendor script，并加入 PWA app shell。
+- 封面 / 账本模式下不再运行 journal 的 60 秒定时任务；进入记录界面后自动关闭过期投票仍正常。
+
+本轮未生成 APK / DMG / IPA，未新增 npm、CDN、远程 API、构建步骤或 `type="module"`。下一阶段恢复 P6-03 跨平台测试安装包路线规划。
+
 ## P6-01 锁屏 / integrity / 业务逻辑小坑修复
 
 P6-01 继续暂停 Android APK / macOS DMG / iOS 自签测试包试制，先收束代码审查中确认的中高优先级逻辑问题：

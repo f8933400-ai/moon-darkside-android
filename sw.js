@@ -28,6 +28,8 @@ const APP_SHELL = [
   "./js/features/tasks.js",
   "./js/features/care.js",
   "./js/features/fronting.js",
+  "./js/vendor/qrcode-generator.js",
+  "./js/vendor/jsqr.js",
   "./js/features/system-card.js",
   "./js/features/ledger.js",
   "./js/features/encrypted-backup.js",
@@ -59,24 +61,32 @@ function isAppShellRequest(request){
   return APP_SHELL_PATHS.has(url.pathname);
 }
 
-function refreshAppShell(request){
-  return fetch(request).then(function(response){
-    if (!response || !response.ok) return response;
-    return caches.open(CACHE_NAME).then(function(cache){
-      cache.put(request, response.clone());
-      return response;
-    });
-  });
+async function refreshAppShell(request){
+  const response = await fetch(request);
+  if (!response || !response.ok) {
+    throw new Error("app shell fetch failed: " + request.url);
+  }
+  const cache = await caches.open(CACHE_NAME);
+  await cache.put(request, response.clone());
+  return response;
 }
 
-function appShellResponse(request){
-  return caches.match(request, { ignoreSearch: true }).then(function(cached){
-    const refresh = refreshAppShell(request).catch(function(){
-      return cached;
+async function appShellResponse(request){
+  const cached = await caches.match(request, { ignoreSearch: true });
+  if (cached) {
+    refreshAppShell(request).catch(function(err){
+      console.warn("SW app shell refresh failed.", err);
     });
+    return cached;
+  }
 
-    return cached || refresh;
-  });
+  try {
+    return await refreshAppShell(request);
+  } catch (err) {
+    const fallback = await caches.match("./", { ignoreSearch: true }) || await caches.match("./index.html", { ignoreSearch: true });
+    if (fallback) return fallback;
+    throw err;
+  }
 }
 
 self.addEventListener("install", function(event){

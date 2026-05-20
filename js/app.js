@@ -628,7 +628,8 @@
     window.onMoonAuthResult=function(ok,message){if(ok){document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();} else if(message){alert(message);}};
     let disclaimerTimer=null;
     function startDisclaimer(){const btn=document.getElementById("enterBtn"); if(disclaimerTimer){clearInterval(disclaimerTimer);disclaimerTimer=null;} let left=3; btn.disabled=true; btn.textContent=`请等待 ${left} 秒`; disclaimerTimer=setInterval(()=>{left-=1; if(left>0){btn.textContent=`请等待 ${left} 秒`; return;} clearInterval(disclaimerTimer); disclaimerTimer=null; btn.disabled=false; btn.textContent="我已了解，进入";},1000); btn.onclick=()=>{if(btn.disabled)return; document.getElementById("disclaimerBackdrop").style.display="none"; promptArrivalIfReady();};}
-    setInterval(async()=>{const changed=await closeDuePolls(); renderPolls(); renderChat(); renderHandoff(); if(changed)renderList();},60000);
+    async function runJournalIntervalTasks(){if(appMode!=="journal")return false; const changed=await closeDuePolls(); renderPolls(); renderChat(); renderHandoff(); if(changed)renderList(); return changed;}
+    setInterval(runJournalIntervalTasks,60000);
     async function runAutoImageMigrationIfNeeded(){
       if(localStorage.getItem("imageMigrationDone")==="1")return;
       const hasLegacyImages=(data.messages||[]).some(m=>m.imageData)||(data.members||[]).some(m=>m.avatarData)||(data.rooms||[]).some(r=>r.backgroundData);
@@ -654,7 +655,7 @@
       ledgerSettings=await loadLedgerSettings();
       currentRoomId=data.rooms[0]?.id||"main";
       appMode=prefs.resetToCover===false?(prefs.lastAppMode||"cover"):"cover";
-      await closeDuePolls();
+      if(appMode==="journal")await closeDuePolls();
       await runAutoImageMigrationIfNeeded();
       if(window.applyLedgerDefaultViewMode)window.applyLedgerDefaultViewMode();
       applyPrefs();

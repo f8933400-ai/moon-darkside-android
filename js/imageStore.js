@@ -2,6 +2,7 @@
       const DB_NAME="moon-images";
       const DB_VERSION=1;
       const STORE_NAME="images";
+      const URL_CACHE_LIMIT=120;
       const urlCache=new Map();
       let dbPromise=null;
 
@@ -82,12 +83,25 @@
 
       async function getImageUrl(id){
         if(!id)throw new Error("getImageUrl requires an id.");
-        if(urlCache.has(id))return urlCache.get(id);
+        if(urlCache.has(id)){
+          const cached=urlCache.get(id);
+          urlCache.delete(id);
+          urlCache.set(id,cached);
+          return cached;
+        }
         const blob=await getImageBlob(id);
         if(!blob)return null;
         const url=URL.createObjectURL(blob);
         urlCache.set(id,url);
+        trimUrlCache();
         return url;
+      }
+
+      function trimUrlCache(){
+        while(urlCache.size>URL_CACHE_LIMIT){
+          const oldest=urlCache.keys().next().value;
+          revokeImageUrl(oldest);
+        }
       }
 
       function revokeImageUrl(id){
@@ -105,20 +119,27 @@
 
       function dataUrlToBlob(dataUrl){
         const text=String(dataUrl||"");
-        const match=text.match(/^data:([^;,]+)?(;base64)?,([\s\S]*)$/);
-        if(!match)throw new Error("Invalid data URL.");
-        const mime=match[1]||"application/octet-stream";
-        const isBase64=!!match[2];
-        const payload=match[3]||"";
-        let binary;
+        if(!text.startsWith("data:"))throw new Error("Invalid data URL.");
+        const commaIndex=text.indexOf(",");
+        if(commaIndex<0)throw new Error("Invalid data URL.");
+        const header=text.slice(5,commaIndex);
+        const payload=text.slice(commaIndex+1);
+        const parts=header.split(";").filter(Boolean);
+        const hasMime=!!(parts[0]&&parts[0].includes("/"));
+        const mime=hasMime?parts[0]:"application/octet-stream";
+        const isBase64=(hasMime?parts.slice(1):parts).some(part=>part.toLowerCase()==="base64");
         try{
-          binary=isBase64?atob(payload):decodeURIComponent(payload);
+          if(isBase64){
+            const binary=atob(payload);
+            const bytes=new Uint8Array(binary.length);
+            for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+            return new Blob([bytes],{type:mime});
+          }
+          const decoded=decodeURIComponent(payload);
+          return new Blob([new TextEncoder().encode(decoded)],{type:mime});
         }catch(err){
           throw new Error("Invalid data URL payload.");
         }
-        const bytes=new Uint8Array(binary.length);
-        for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-        return new Blob([bytes],{type:mime});
       }
 
       function blobToDataUrl(blob){
@@ -161,5 +182,5 @@
         }
       }
 
-      window.imageStore={putImage,getImageBlob,deleteImage,listImages,getImageUrl,revokeImageUrl,dataUrlToBlob,blobToDataUrl,clearImageCache,selfTest};
+      window.imageStore={putImage,getImageBlob,deleteImage,listImages,getImageUrl,revokeImageUrl,dataUrlToBlob,blobToDataUrl,clearImageCache,selfTest,_urlCache:urlCache,_urlCacheLimit:URL_CACHE_LIMIT};
     })();
