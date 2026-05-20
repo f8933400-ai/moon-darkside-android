@@ -66,6 +66,16 @@
     if(advancedSearchCloseBtn)advancedSearchCloseBtn.onclick=()=>window.closeAdvancedSearchModal&&window.closeAdvancedSearchModal();
     if(advancedSearchKeyword)advancedSearchKeyword.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault(); advancedSearchRunBtn?.click();}});
     if(advancedSearchResults)advancedSearchResults.addEventListener("click",e=>{const btn=e.target.closest("[data-search-type][data-search-id]"); if(!btn||!advancedSearchResults.contains(btn))return; window.jumpToSearchResult&&window.jumpToSearchResult(btn.dataset.searchType,btn.dataset.searchId);});
+    const timelineBtn=document.getElementById("timelineBtn");
+    const timelineRunBtn=document.getElementById("timelineRunBtn");
+    const timelineResetBtn=document.getElementById("timelineResetBtn");
+    const timelineMonthReviewBtn=document.getElementById("timelineMonthReviewBtn");
+    const timelineList=document.getElementById("timelineList");
+    if(timelineBtn)timelineBtn.onclick=()=>window.openTimelineModal&&window.openTimelineModal();
+    if(timelineRunBtn)timelineRunBtn.onclick=()=>window.renderTimeline&&window.renderTimeline();
+    if(timelineResetBtn)timelineResetBtn.onclick=()=>window.resetTimelineFilters&&window.resetTimelineFilters();
+    if(timelineMonthReviewBtn)timelineMonthReviewBtn.onclick=()=>window.renderMonthlyReview&&window.renderMonthlyReview();
+    if(timelineList)timelineList.addEventListener("click",e=>{const btn=e.target.closest("[data-timeline-type][data-timeline-id]"); if(!btn||!timelineList.contains(btn))return; window.timelineJumpToEvent&&window.timelineJumpToEvent(btn.dataset.timelineType,btn.dataset.timelineId);});
     document.getElementById("kindManageBtn").onclick=()=>{renderKindManager(); openModal("kindModal");};
     document.getElementById("saveKindBtn").onclick=saveKind;
     document.getElementById("deleteKindBtn").onclick=()=>deleteKind(kind.value);
