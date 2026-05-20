@@ -244,7 +244,7 @@
     document.getElementById("exportBtn").onclick=()=>{closeModal("settingsModal"); openExportModal();};
     document.getElementById("exportScope").onchange=updateExportRoomPicker;
     document.getElementById("exportRedacted").onchange=e=>{if(e.target.checked){document.getElementById("exportExcludePrivate").checked=true;} updateRedactionControls();};
-    document.getElementById("exportFormat").onchange=updateRedactionControls;
+    document.getElementById("exportFormat").onchange=()=>{updateRedactionControls(); if(typeof window.updateReviewExportOptionsVisibility==="function")window.updateReviewExportOptionsVisibility();};
     document.getElementById("confirmExportBtn").onclick=()=>downloadExport().catch(err=>{console.error("导出失败",err); alert("导出失败："+(err.message||err));});
     document.getElementById("importBtn").onclick=()=>importInput.click();
     importInput.onchange=()=>{const file=importInput.files?.[0]; importInput.value=""; importBackupFile(file);};
