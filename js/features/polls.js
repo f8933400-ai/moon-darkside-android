@@ -248,22 +248,22 @@
       return `<div class="poll-decision-box readonly"><strong>最终决定</strong><p>${esc(value)}</p></div>`;
     }
     function pollActionButtonsHtml(poll,canVote){
-      const id=esc(poll.id);
+      const id=jsAttrArg(poll.id);
       const status=String(poll.status||"open");
       const buttons=[];
-      if(canVote)buttons.push(`<button class="light small" type="button" onclick="submitPollVoteFromSelection('${id}')">保存${term("poll")} / 理由</button>`);
+      if(canVote)buttons.push(`<button class="light small" type="button" onclick="submitPollVoteFromSelection(${id})">保存${term("poll")} / 理由</button>`);
       if(status==="open"){
-        buttons.push(`<button class="light small" type="button" onclick="pausePoll('${id}')">暂停</button>`);
-        buttons.push(`<button class="danger small" type="button" onclick="cancelPoll('${id}')">取消</button>`);
-        buttons.push(`<button class="danger small" type="button" onclick="finishPoll('${id}')">结束</button>`);
+        buttons.push(`<button class="light small" type="button" onclick="pausePoll(${id})">暂停</button>`);
+        buttons.push(`<button class="danger small" type="button" onclick="cancelPoll(${id})">取消</button>`);
+        buttons.push(`<button class="danger small" type="button" onclick="finishPoll(${id})">结束</button>`);
       } else if(status==="paused"){
-        buttons.push(`<button class="light small" type="button" onclick="resumePoll('${id}')">恢复</button>`);
-        buttons.push(`<button class="danger small" type="button" onclick="cancelPoll('${id}')">取消</button>`);
-        buttons.push(`<button class="danger small" type="button" onclick="finishPoll('${id}')">结束</button>`);
+        buttons.push(`<button class="light small" type="button" onclick="resumePoll(${id})">恢复</button>`);
+        buttons.push(`<button class="danger small" type="button" onclick="cancelPoll(${id})">取消</button>`);
+        buttons.push(`<button class="danger small" type="button" onclick="finishPoll(${id})">结束</button>`);
       } else if(status==="closed") {
-        buttons.push(`<button class="light small" type="button" onclick="copyPollResult('${id}')">再写入交接</button>`);
+        buttons.push(`<button class="light small" type="button" onclick="copyPollResult(${id})">再写入交接</button>`);
       }
-      buttons.push(`<button class="danger small" type="button" onclick="deletePoll('${id}')">删除${term("poll")}</button>`);
+      buttons.push(`<button class="danger small" type="button" onclick="deletePoll(${id})">删除${term("poll")}</button>`);
       return buttons.join("");
     }
     function renderPolls(){

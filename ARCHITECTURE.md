@@ -232,19 +232,20 @@ ID 命名规则：
 
 JSON 完整备份和 UI 完整 JSON 导出都使用同一语义：
 
-- `formatExportJsonAsync()` 导出 UI JSON。
+- `formatExportJsonAsync(scopeOverride)` 导出 UI JSON；encrypted-json 调用时固定使用完整范围。
 - `storage.exportBackup()` 导出程序化完整备份。
 - 两者都会在导出对象的深拷贝上调用 `hydrateImagesForJsonExport()`。
 - hydrate 会读取 IndexedDB Blob，并在导出副本中补齐 `imageData/avatarData/backgroundData`。
 - hydrate 不修改运行时 `data`。
 - 主记录完整 JSON / encrypted-json 默认不包含 `ledgerRecords` 或 `ledgerSettings`。账本使用首页的账本专用 JSON / CSV 导出。
+- 普通 JSON 的 current / room 范围不是严格脱敏分享文件；它会过滤部分房间相关数据，但仍可能保留全局成员、系统资料或配置。
 
 JSON 导入路径：
 
 ```text
 importBackupFile(file)
   -> storage.importBackup(parsed)
-  -> externalizeImagesAfterJsonImport(incoming)
+  -> externalizeImagesAfterJsonImport(incoming, { keepBadIntegrityMessages })
   -> data = incoming
   -> save()
   -> render()
@@ -256,7 +257,7 @@ importBackupFile(file)
 - 如果有 `avatarData`，写入 IndexedDB，设置 `avatarId`，删除 `avatarData`。
 - 如果有 `backgroundData`，写入 IndexedDB，设置 `backgroundId`，删除 `backgroundData`。
 - 如果新版 JSON 同时包含 ID 和 DataURL，优先用 DataURL 恢复同 ID 图片。
-- `externalizeImagesAfterJsonImport()` 完成后会按现有规则重算所有消息 `integrity`。
+- `externalizeImagesAfterJsonImport()` 完成后会按现有规则重算原本校验正常的消息 `integrity`；原备份中已经校验异常的消息不会被静默重算成正常。
 - JSON 导入失败不会覆盖当前 `data`。
 - 如果旧版主记录备份中存在 `ledgerRecords`，主记录导入只提示，不会自动覆盖当前账本。
 
@@ -284,7 +285,7 @@ importBackupFile(file)
 合法重算 integrity 的场景：
 
 - 图片外置迁移 `imageData -> imageId`。
-- JSON 导入 externalize 图片之后。
+- JSON 导入 externalize 图片之后，但原备份中已经校验异常的消息不得被静默洗成正常。
 - 新建消息时由 `makeMessage()` 生成。
 
 ## 10. 启动与渲染
@@ -336,9 +337,9 @@ P0-P2 当前模块包括：
 
 - Markdown / TXT / CSV 支持脱敏导出。
 - JSON 用于完整备份，默认保留全量数据；完整 JSON 备份包含图片 DataURL hydrate 结果。
-- 局部 current / room JSON 不默认带出 `tasks`、`careLogs`、`careChecklist`。
+- 局部 current / room JSON 不默认带出 `tasks`、`careLogs`、`careChecklist`，但可能仍包含全局成员、系统资料、成员关系、系统名片或配置，因此不是严格脱敏分享文件。
 - 完整 all JSON 包含主记录数据、任务和照护数据，但不包含 `ledgerRecords` 或 `ledgerSettings`。
-- encrypted-json 复用完整 JSON，因此同样不包含 `ledgerRecords` 或 `ledgerSettings`。
+- encrypted-json 固定复用完整 all JSON，不受当前导出范围影响，因此同样不包含 `ledgerRecords` 或 `ledgerSettings`。
 - 如需迁移账本，应使用首页的账本导入功能；旧版主记录备份里的 `ledgerRecords` 不会在主导入时自动恢复。账本 JSON v2 会携带 records 和 settings，导入时替换账本记录和账本设置；v1 只携带 records，导入时只替换账本记录并保留当前账本设置。分类改名不会批量迁移旧记录里的 `category` 字符串，分类预算按 `categoryName` 匹配旧记录分类名。
 
 复盘报告导出：
@@ -383,9 +384,10 @@ P0-P2 当前模块包括：
 8. `renderChat()` 必须保持 async + `_renderChatSeq`。
 9. JSON 完整备份必须尽量 hydrate 图片，保持单文件恢复语义。
 10. JSON 导入失败不能覆盖当前 `data`。
-11. 不自动运行健康检查、孤儿清理或备份修复。
-12. 不把“接续面板”改回旧名称。
-13. 不把 visibility 当作安全加密边界；它只影响应用内展示和导出。
+11. 新写入图片后如果主数据保存失败，应尽量删除本次新图片并恢复内存状态；删除或替换旧头像 / 背景时，旧图片应延后到主数据保存成功后清理。
+12. 不自动运行健康检查、孤儿清理或备份修复。
+13. 不把“接续面板”改回旧名称。
+14. 不把 visibility 当作安全加密边界；它只影响应用内展示和导出。
 
 ## 15. 已知局限与后续方向
 

@@ -233,7 +233,8 @@
         const primary=f.primaryMemberId&&ids.includes(f.primaryMemberId)?f.primaryMemberId:null;
         const endText=f.endAt?formatFrontingTime(f.endAt):"仍在进行";
         const duration=formatFrontingDuration(f.startAt,f.endAt);
-        return `<div class="fronting-log-card fronting-card"><div class="fronting-log-head"><div><div class="fronting-who">${esc(frontingNamesWithFocus(ids,primary,`未记录${term("member")}`))}</div><div class="fronting-log-meta"><span class="fronting-chip">${esc(frontingStateText(f.stateType))}</span><span>记忆：${esc(frontingMemoryText(f.memoryRating))}</span></div></div><div class="fronting-log-actions"><button class="light small" type="button" onclick="editFrontingLog('${esc(f.id)}')">编辑</button><button class="danger small" type="button" onclick="deleteFrontingLog('${esc(f.id)}')">删除</button></div></div><div class="fronting-time">${esc(formatFrontingTime(f.startAt))} → ${esc(endText)} · ${esc(duration)}</div>${f.note?`<div class="fronting-note">${esc(f.note)}</div>`:""}</div>`;
+        const idArg=jsAttrArg(f.id);
+        return `<div class="fronting-log-card fronting-card"><div class="fronting-log-head"><div><div class="fronting-who">${esc(frontingNamesWithFocus(ids,primary,`未记录${term("member")}`))}</div><div class="fronting-log-meta"><span class="fronting-chip">${esc(frontingStateText(f.stateType))}</span><span>记忆：${esc(frontingMemoryText(f.memoryRating))}</span></div></div><div class="fronting-log-actions"><button class="light small" type="button" onclick="editFrontingLog(${idArg})">编辑</button><button class="danger small" type="button" onclick="deleteFrontingLog(${idArg})">删除</button></div></div><div class="fronting-time">${esc(formatFrontingTime(f.startAt))} → ${esc(endText)} · ${esc(duration)}</div>${f.note?`<div class="fronting-note">${esc(f.note)}</div>`:""}</div>`;
       }).join("")+limited:`<div class="empty">还没有${esc(term("fronting"))}记录。</div>`;
     }
     function bindFrontingControls(){

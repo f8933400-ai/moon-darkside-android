@@ -17,10 +17,11 @@
     function redactedMdMessageBody(message,options){const text=redactTextForExport(message.text||"",options).replace(/\n/g,"\n  "); const image=(message.imageData||message.imageId)?"[含图片]":""; return [text,image].filter(Boolean).join(text&&image?"\n\n  ":"");}
     function redactedSystemProfileLines(options){const profile=redactSystemProfileForExport(data.systemProfile, data.systemProfileVisibility, "public"); return Object.entries(profile).map(([key,value])=>({label:SYSTEM_PROFILE_EXPORT_LABELS[key]||key,value:redactTextForExport(value,options)}));}
     function redactedSystemProfileBlock(format,options){const lines=redactedSystemProfileLines(options); if(!lines.length)return ""; if(format==="md")return ["## 系统公开资料",...lines.map(row=>`- **${row.label}**：${row.value}`),"","可见性只影响本应用内展示和导出，不是加密隔离。"].join("\n"); return ["【系统公开资料】",...lines.map(row=>`${row.label}：${row.value}`),"可见性只影响本应用内展示和导出，不是加密隔离。"].join("\n");}
-    function openExportModal(){document.getElementById("exportRoom").innerHTML=data.rooms.map(r=>`<option value="${r.id}">${esc(roomDisplayName(r))}</option>`).join(""); document.getElementById("exportRoom").value=currentRoomId; document.getElementById("exportScope").value="current"; const redacted=document.getElementById("exportRedacted"), exclude=document.getElementById("exportExcludePrivate"), hide=document.getElementById("exportHideMemberNames"); if(redacted)redacted.checked=false; if(exclude)exclude.checked=true; if(hide)hide.checked=false; resetReviewExportControls(); resetEncryptedImportControls(); updateRedactionControls(); updateExportRoomPicker(); updateReviewExportOptionsVisibility(); updateEncryptedBackupOptionsVisibility(); openModal("exportModal");}
-    function updateExportRoomPicker(){const isRoom=document.getElementById("exportScope").value==="room"; document.getElementById("exportRoom").style.display=isRoom?"block":"none"; document.getElementById("exportRoomLabel").style.display=isRoom?"block":"none";}
-    function selectedExportRooms(){const scope=document.getElementById("exportScope").value; if(scope==="all")return data.rooms; if(scope==="room")return data.rooms.filter(r=>r.id===document.getElementById("exportRoom").value); return data.rooms.filter(r=>r.id===currentRoomId);}
-    function selectedExportData(){const rooms=selectedExportRooms(); const ids=new Set(rooms.map(r=>r.id)); const messages=data.messages.filter(m=>ids.has(m.roomId)); return {rooms,messages};}
+    function openExportModal(){document.getElementById("exportRoom").innerHTML=data.rooms.map(r=>`<option value="${esc(r.id)}">${esc(roomDisplayName(r))}</option>`).join(""); document.getElementById("exportRoom").value=currentRoomId; document.getElementById("exportScope").value="current"; const redacted=document.getElementById("exportRedacted"), exclude=document.getElementById("exportExcludePrivate"), hide=document.getElementById("exportHideMemberNames"); if(redacted)redacted.checked=false; if(exclude)exclude.checked=true; if(hide)hide.checked=false; resetReviewExportControls(); resetEncryptedImportControls(); updateRedactionControls(); updateExportRoomPicker(); updateReviewExportOptionsVisibility(); updateEncryptedBackupOptionsVisibility(); openModal("exportModal");}
+    function isEncryptedJsonExportSelected(){return document.getElementById("exportFormat")?.value==="encrypted-json";}
+    function updateExportRoomPicker(){const scopeEl=document.getElementById("exportScope"), roomEl=document.getElementById("exportRoom"), labelEl=document.getElementById("exportRoomLabel"); const encrypted=isEncryptedJsonExportSelected(); if(encrypted&&scopeEl)scopeEl.value="all"; if(scopeEl)scopeEl.disabled=encrypted; if(roomEl)roomEl.disabled=encrypted; const isRoom=!encrypted&&scopeEl?.value==="room"; if(roomEl)roomEl.style.display=isRoom?"block":"none"; if(labelEl)labelEl.style.display=isRoom?"block":"none";}
+    function selectedExportRooms(scopeOverride){const scope=scopeOverride||document.getElementById("exportScope").value; if(scope==="all")return data.rooms; if(scope==="room")return data.rooms.filter(r=>r.id===document.getElementById("exportRoom").value); return data.rooms.filter(r=>r.id===currentRoomId);}
+    function selectedExportData(scopeOverride){const rooms=selectedExportRooms(scopeOverride); const ids=new Set(rooms.map(r=>r.id)); const messages=data.messages.filter(m=>ids.has(m.roomId)); return {rooms,messages};}
     function formatExport(format){
       const selected=selectedExportData();
       const selectedRoomIds=new Set(selected.rooms.map(r=>r.id));
@@ -392,7 +393,7 @@
       return {text,type:isMarkdown?"text/markdown;charset=utf-8":"text/plain;charset=utf-8",ext,filename:`moon-review-${reviewFilenameStamp()}.${ext}`};
     }
     async function hydrateImagesForJsonExport(exportObj){let anyMissing=false; for(const m of exportObj.messages||[]){if(m.imageId&&!m.imageData){try{const blob=await window.imageStore.getImageBlob(m.imageId); if(blob){m.imageData=await window.imageStore.blobToDataUrl(blob);}else{console.warn("hydrateImagesForJsonExport: missing blob for imageId",m.imageId); anyMissing=true;}}catch(err){console.warn("hydrateImagesForJsonExport: failed to hydrate imageId",m.imageId,err); anyMissing=true;}}} for(const mb of exportObj.members||[]){if(mb.avatarId&&!mb.avatarData){try{const blob=await window.imageStore.getImageBlob(mb.avatarId); if(blob){mb.avatarData=await window.imageStore.blobToDataUrl(blob);}else{console.warn("hydrateImagesForJsonExport: missing blob for avatarId",mb.avatarId); anyMissing=true;}}catch(err){console.warn("hydrateImagesForJsonExport: failed to hydrate avatarId",mb.avatarId,err); anyMissing=true;}}} for(const r of exportObj.rooms||[]){if(r.backgroundId&&!r.backgroundData){try{const blob=await window.imageStore.getImageBlob(r.backgroundId); if(blob){r.backgroundData=await window.imageStore.blobToDataUrl(blob);}else{console.warn("hydrateImagesForJsonExport: missing blob for backgroundId",r.backgroundId); anyMissing=true;}}catch(err){console.warn("hydrateImagesForJsonExport: failed to hydrate backgroundId",r.backgroundId,err); anyMissing=true;}}} return anyMissing;}
-    async function formatExportJsonAsync(){const selected=selectedExportData(); const selectedRoomIds=new Set(selected.rooms.map(r=>r.id)); const includeFullScope=document.getElementById("exportScope").value==="all"; const exportObj=JSON.parse(JSON.stringify({app:"月之暗面",version:2,exportedAt:now(),nextSeq:data.nextSeq,tags:data.tags||[],messageKinds:data.messageKinds||DEFAULT_KINDS,polls:(data.polls||[]).filter(p=>selectedRoomIds.has(p.roomId)),handoffNotes:(data.handoffNotes||[]).filter(n=>selectedRoomIds.has(n.roomId)),frontingLogs:data.frontingLogs||[],...(includeFullScope?{tasks:data.tasks||[],careLogs:data.careLogs||[],careChecklist:data.careChecklist||[]}:{}),systemProfile:data.systemProfile||blankSystemProfile(),systemProfileVisibility:normalizeSystemProfileVisibilityRecord(data.systemProfileVisibility),memberRelations:data.memberRelations||[],externalSystemCards:data.externalSystemCards||[],rooms:selected.rooms,members:data.members,messages:selected.messages})); const anyMissing=await hydrateImagesForJsonExport(exportObj); if(anyMissing)alert("警告：部分图片在 IndexedDB 中找不到，备份可能不完整。\n\n建议先运行 window.runImageMigrationToIndexedDB() 迁移旧图片后再导出。"); return {text:JSON.stringify(exportObj,null,2),type:"application/json",ext:"json"};}
+    async function formatExportJsonAsync(scopeOverride){const scope=scopeOverride||document.getElementById("exportScope").value; const selected=selectedExportData(scope); const selectedRoomIds=new Set(selected.rooms.map(r=>r.id)); const includeFullScope=scope==="all"; const exportObj=JSON.parse(JSON.stringify({app:"月之暗面",version:2,exportedAt:now(),nextSeq:data.nextSeq,tags:data.tags||[],messageKinds:data.messageKinds||DEFAULT_KINDS,polls:(data.polls||[]).filter(p=>selectedRoomIds.has(p.roomId)),handoffNotes:(data.handoffNotes||[]).filter(n=>selectedRoomIds.has(n.roomId)),frontingLogs:data.frontingLogs||[],...(includeFullScope?{tasks:data.tasks||[],careLogs:data.careLogs||[],careChecklist:data.careChecklist||[]}:{}),systemProfile:data.systemProfile||blankSystemProfile(),systemProfileVisibility:normalizeSystemProfileVisibilityRecord(data.systemProfileVisibility),memberRelations:data.memberRelations||[],externalSystemCards:data.externalSystemCards||[],rooms:selected.rooms,members:data.members,messages:selected.messages})); const anyMissing=await hydrateImagesForJsonExport(exportObj); if(anyMissing)alert("警告：部分图片在 IndexedDB 中找不到，备份可能不完整。\n\n建议先运行 window.runImageMigrationToIndexedDB() 迁移旧图片后再导出。"); return {text:JSON.stringify(exportObj,null,2),type:"application/json",ext:"json"};}
     async function downloadExport(){
       const format=document.getElementById("exportFormat").value;
       if(isReviewExportFormat(format)){
@@ -410,11 +411,12 @@
         closeModal("exportModal");
         return;
       }
-      const scope=document.getElementById("exportScope").value;
-      const rooms=selectedExportRooms();
+      const scope=format==="encrypted-json"?"all":document.getElementById("exportScope").value;
+      const rooms=selectedExportRooms(scope);
       const options=getRedactionOptions();
       const isJsonBackup=format==="json"||format==="encrypted-json";
-      if(isJsonBackup&&options.redacted)alert("JSON 用于完整备份，默认保留全量数据；脱敏导出请使用 Markdown / TXT / CSV。本次 JSON 会按完整备份导出。");
+      if(isJsonBackup&&options.redacted)alert("JSON 备份会保留结构化主记录数据；脱敏导出请使用 Markdown / TXT / CSV。本次 JSON 不会应用脱敏选项。");
+      if(format==="json"&&scope!=="all"&&!confirm("当前导出的 JSON 不是完整备份，且可能仍包含全局成员、系统资料或配置；它主要用于局部恢复或排查，不适合作为脱敏分享文件。\n\n完整备份请改选“全部群组”或“加密完整 JSON 备份”。是否继续导出局部 JSON？"))return;
       if(!isJsonBackup&&options.redacted&&options.excludePrivate&&rooms.length&&!rooms.some(r=>!isPrivateRoom(r))){alert("当前导出范围只包含私聊 / 小群聊，且已选择排除私聊，因此没有可导出的内容。可以取消“排除私聊”，或改选其它范围。"); return;}
       const hasPrivate=rooms.some(isPrivateRoom);
       if(!isJsonBackup&&hasPrivate&&!(options.redacted&&options.excludePrivate)){
@@ -432,7 +434,7 @@
         const btn=document.getElementById("confirmExportBtn");
         btn.disabled=true;
         try{
-          const jsonResult=await formatExportJsonAsync();
+          const jsonResult=await formatExportJsonAsync(format==="encrypted-json"?"all":scope);
           if(format==="encrypted-json"){
             const fields=getEncryptedBackupPasswordFields();
             const envelope=await exportEncryptedBackup(JSON.parse(jsonResult.text),fields.password);
@@ -468,15 +470,17 @@
       clearEncryptedBackupPasswordFields();
       updateEncryptedBackupOptionsVisibility();
     }
-    async function externalizeImagesAfterJsonImport(appData){for(const m of appData.messages||[]){if(m.imageData){const imageId=m.imageId||`msgimg-${m.id}`; const blob=window.imageStore.dataUrlToBlob(m.imageData); const mime=m.imageType||blob.type||"image/*"; await window.imageStore.putImage({id:imageId,blob,mime,name:m.imageName||"图片"}); m.imageId=imageId; delete m.imageData;}else if(m.imageId){const blob=await window.imageStore.getImageBlob(m.imageId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: imageId not found in IndexedDB",m.imageId);}} for(const mb of appData.members||[]){if(mb.avatarData){const avatarId=mb.avatarId||`avatar-${mb.id}`; const blob=window.imageStore.dataUrlToBlob(mb.avatarData); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:avatarId,blob,mime,name:`${mb.name||"member"}-头像`}); mb.avatarId=avatarId; delete mb.avatarData;}else if(mb.avatarId){const blob=await window.imageStore.getImageBlob(mb.avatarId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: avatarId not found in IndexedDB",mb.avatarId);}} for(const r of appData.rooms||[]){if(r.backgroundData){const backgroundId=r.backgroundId||`roombg-${r.id}`; const blob=window.imageStore.dataUrlToBlob(r.backgroundData); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:backgroundId,blob,mime,name:`${r.name||r.id||"room"}-背景`}); r.backgroundId=backgroundId; delete r.backgroundData;}else if(r.backgroundId){const blob=await window.imageStore.getImageBlob(r.backgroundId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: backgroundId not found in IndexedDB",r.backgroundId);}} /* JSON 导入把 DataURL 外置到 IndexedDB：imageData(_imgVer:1) → imageId(_imgVer:2)，按现有规则重算 integrity */ for(const m of appData.messages||[])m.integrity=messageIntegrity(m);}
+    async function externalizeImagesAfterJsonImport(appData,options={}){const keepBadIntegrity=options.keepBadIntegrityMessages instanceof Set?options.keepBadIntegrityMessages:new Set(); for(const m of appData.messages||[]){if(m.imageData){const imageId=m.imageId||`msgimg-${m.id}`; const blob=window.imageStore.dataUrlToBlob(m.imageData); const mime=m.imageType||blob.type||"image/*"; await window.imageStore.putImage({id:imageId,blob,mime,name:m.imageName||"图片"}); m.imageId=imageId; delete m.imageData;}else if(m.imageId){const blob=await window.imageStore.getImageBlob(m.imageId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: imageId not found in IndexedDB",m.imageId);}} for(const mb of appData.members||[]){if(mb.avatarData){const avatarId=mb.avatarId||`avatar-${mb.id}`; const blob=window.imageStore.dataUrlToBlob(mb.avatarData); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:avatarId,blob,mime,name:`${mb.name||"member"}-头像`}); mb.avatarId=avatarId; delete mb.avatarData;}else if(mb.avatarId){const blob=await window.imageStore.getImageBlob(mb.avatarId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: avatarId not found in IndexedDB",mb.avatarId);}} for(const r of appData.rooms||[]){if(r.backgroundData){const backgroundId=r.backgroundId||`roombg-${r.id}`; const blob=window.imageStore.dataUrlToBlob(r.backgroundData); const mime=blob.type||"image/*"; await window.imageStore.putImage({id:backgroundId,blob,mime,name:`${r.name||r.id||"room"}-背景`}); r.backgroundId=backgroundId; delete r.backgroundData;}else if(r.backgroundId){const blob=await window.imageStore.getImageBlob(r.backgroundId).catch(()=>null); if(!blob)console.warn("externalizeImagesAfterJsonImport: backgroundId not found in IndexedDB",r.backgroundId);}} /* JSON 导入把 DataURL 外置到 IndexedDB：imageData(_imgVer:1) → imageId(_imgVer:2)，正常消息按现有规则重算 integrity；原备份已异常的消息保留异常状态。 */ for(const m of appData.messages||[]){if(!keepBadIntegrity.has(m))m.integrity=messageIntegrity(m);}}
     async function importParsedBackup(parsed){
       const incoming=await storage.importBackup(parsed);
       const hasLegacyLedger=Array.isArray(parsed?.ledgerRecords);
-      const bad=incoming.messages.filter(m=>!integrityOk(m)).length;
-      const note=bad?`\n\n注意：备份中有 ${bad} 条消息校验异常，仍可导入，但建议确认来源。`:"";
+      const badMessages=incoming.messages.filter(m=>!integrityOk(m));
+      const bad=badMessages.length;
+      const badIntegritySet=new Set(badMessages);
+      const note=bad?`\n\n注意：备份中有 ${bad} 条消息校验异常，仍可导入。导入后这些消息会保留为校验异常，请确认来源。`:"";
       const ledgerNote=hasLegacyLedger?"\n\n检测到旧版备份里包含账本数据。本次只导入主记录数据，不会自动覆盖当前账本。":"";
       if(!confirm(`导入会覆盖当前本机数据。\n\n备份包含 ${incoming.rooms.length} 个群组、${incoming.members.length} 个成员、${incoming.messages.length} 条消息。${ledgerNote}${note}\n\n确定导入吗？`))return false;
-      await externalizeImagesAfterJsonImport(incoming);
+      await externalizeImagesAfterJsonImport(incoming,{keepBadIntegrityMessages:badIntegritySet});
       const previousData=data, previousRoomId=currentRoomId;
       data=incoming;
       currentRoomId=data.rooms[0]?.id||"main";
@@ -484,7 +488,8 @@
       closeModal("exportModal");
       resetEncryptedImportControls();
       render();
-      alert(hasLegacyLedger?"备份已导入。\n\n检测到旧版备份里包含账本数据。本次没有自动导入账本。请到账本页使用账本导入功能单独处理。":"备份已导入。");
+      const integrityNote=bad?`\n\n备份中有 ${bad} 条消息在原备份中校验异常，已保留为异常状态，请确认来源。`:"";
+      alert(hasLegacyLedger?`备份已导入。${integrityNote}\n\n检测到旧版备份里包含账本数据。本次没有自动导入账本。请到账本页使用账本导入功能单独处理。`:`备份已导入。${integrityNote}`);
       return true;
     }
     async function importPendingEncryptedBackup(){
