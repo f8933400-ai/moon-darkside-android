@@ -215,7 +215,9 @@
         if(!item)return;
         item.done=typeof doneValue==="boolean"?doneValue:!item.done;
         item.updatedAt=now();
-        if(await save())renderCareChecklist();
+        renderCareChecklist();
+        if(typeof debouncedSave==="function")debouncedSave("照护清单保存");
+        else safeSave("照护清单保存");
       }
       async function deleteCareChecklistItem(id){
         if(!id)return;

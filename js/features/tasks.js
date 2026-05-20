@@ -82,7 +82,9 @@
         if(!task)return null;
         task.status=status;
         task.updatedAt=now();
-        if(await save())renderTasks();
+        renderTasks();
+        if(typeof debouncedSave==="function")debouncedSave("任务状态保存");
+        else safeSave("任务状态保存");
         return task;
       }
       function startTask(taskId){return updateTaskStatus(taskId,"doing");}
