@@ -1,7 +1,6 @@
 package moon.darkside.android;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
@@ -32,6 +31,10 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
 import androidx.webkit.WebViewAssetLoader;
 
 import java.io.ByteArrayInputStream;
@@ -40,8 +43,9 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.concurrent.Executor;
 
-public class MainActivity extends Activity {
+public class MainActivity extends FragmentActivity {
     private static final String TAG = "MoonAndroid";
     private static final String APP_HOST = "appassets.androidplatform.net";
     private static final String START_URL = "https://" + APP_HOST + "/assets/www/index.html";
@@ -50,6 +54,7 @@ public class MainActivity extends Activity {
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
+    private boolean pendingBackgroundHomeReturn = false;
 
     private final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
             .setDomain(APP_HOST)
@@ -82,6 +87,7 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
         view.addJavascriptInterface(new MoonDownloadBridge(), "MoonAndroidDownloads");
+        view.addJavascriptInterface(new MoonBiometricBridge(), "MoonAndroidBiometric");
         view.setWebViewClient(new MoonWebViewClient());
         view.setWebChromeClient(new MoonWebChromeClient());
         view.setDownloadListener(downloadListener);
@@ -94,6 +100,87 @@ public class MainActivity extends Activity {
                 : "保存失败：Android 测试壳不允许外部下载。";
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     };
+
+    private class MoonBiometricBridge {
+        @JavascriptInterface
+        public boolean isAvailable() {
+            return biometricCanAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS;
+        }
+
+        @JavascriptInterface
+        public void authenticate(String requestId) {
+            runOnUiThread(() -> startBiometricAuthentication(String.valueOf(requestId == null ? "" : requestId)));
+        }
+    }
+
+    private int biometricAuthenticators() {
+        return BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
+    }
+
+    private int biometricCanAuthenticate() {
+        try {
+            return BiometricManager.from(this).canAuthenticate(biometricAuthenticators());
+        } catch (Exception err) {
+            Log.w(TAG, "Biometric availability check failed", err);
+            return BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE;
+        }
+    }
+
+    private String biometricStatusMessage(int status) {
+        if (status == BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED) return "当前 Android 设备未设置系统生物识别或屏幕锁，请使用密码解锁。";
+        if (status == BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE) return "当前 Android 设备未检测到可用的系统生物识别，请使用密码解锁。";
+        if (status == BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE) return "当前 Android 设备的系统生物识别暂不可用，请使用密码解锁。";
+        return "当前 Android 设备未检测到可用的系统生物识别，请使用密码解锁。";
+    }
+
+    private void startBiometricAuthentication(String requestId) {
+        int status = biometricCanAuthenticate();
+        if (status != BiometricManager.BIOMETRIC_SUCCESS) {
+            sendBiometricResult(requestId, false, biometricStatusMessage(status));
+            return;
+        }
+
+        Executor executor = ContextCompat.getMainExecutor(this);
+        BiometricPrompt prompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
+            @Override
+            public void onAuthenticationError(int errorCode, CharSequence errString) {
+                super.onAuthenticationError(errorCode, errString);
+                String message = String.valueOf(errString == null ? "" : errString).trim();
+                if (message.isEmpty()) message = "生物识别已取消，请使用密码解锁。";
+                sendBiometricResult(requestId, false, message);
+            }
+
+            @Override
+            public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                super.onAuthenticationSucceeded(result);
+                sendBiometricResult(requestId, true, "");
+            }
+
+            @Override
+            public void onAuthenticationFailed() {
+                super.onAuthenticationFailed();
+                Toast.makeText(MainActivity.this, "识别未通过，请重试或使用密码。", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("解锁月之暗面")
+                .setSubtitle("使用系统生物识别或设备凭据")
+                .setAllowedAuthenticators(biometricAuthenticators())
+                .build();
+
+        try {
+            prompt.authenticate(promptInfo);
+        } catch (Exception err) {
+            Log.w(TAG, "Biometric prompt failed", err);
+            sendBiometricResult(requestId, false, safeErrorMessage(err));
+        }
+    }
+
+    private void sendBiometricResult(String requestId, boolean ok, String message) {
+        runJavascript("window.__moonAndroidBiometricResult&&window.__moonAndroidBiometricResult("
+                + jsonString(requestId) + "," + (ok ? "true" : "false") + "," + jsonString(message) + ")");
+    }
 
     private class MoonDownloadBridge {
         @JavascriptInterface
@@ -263,10 +350,68 @@ public class MainActivity extends Activity {
                 .replace("\r", "\\r");
     }
 
+    private String jsonString(String value) {
+        return "\"" + jsonEscape(value) + "\"";
+    }
+
     private String safeErrorMessage(Exception err) {
         String message = err == null ? "" : err.getMessage();
         if (message == null || message.trim().isEmpty()) message = err == null ? "未知错误" : err.getClass().getSimpleName();
         return message;
+    }
+
+    private void runJavascript(String script) {
+        WebView view = webView;
+        if (view == null) return;
+        try {
+            view.post(() -> {
+                try {
+                    view.evaluateJavascript("(function(){try{" + script + ";}catch(err){console.error(err);}})();", null);
+                } catch (Exception err) {
+                    Log.w(TAG, "evaluateJavascript failed", err);
+                }
+            });
+        } catch (Exception err) {
+            Log.w(TAG, "runJavascript failed", err);
+        }
+    }
+
+    private void notifyAndroidBackgrounded(String reason) {
+        runJavascript("window.__moonAndroidAppBackgrounded&&window.__moonAndroidAppBackgrounded(" + jsonString(reason) + ")");
+    }
+
+    private void notifyAndroidForegrounded() {
+        runJavascript("window.__moonAndroidAppForegrounded&&window.__moonAndroidAppForegrounded()");
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        pendingBackgroundHomeReturn = true;
+        notifyAndroidBackgrounded("userLeaveHint");
+        super.onUserLeaveHint();
+    }
+
+    @Override
+    protected void onPause() {
+        notifyAndroidBackgrounded("pause");
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        pendingBackgroundHomeReturn = true;
+        notifyAndroidBackgrounded("stop");
+        super.onStop();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (pendingBackgroundHomeReturn) {
+            pendingBackgroundHomeReturn = false;
+            notifyAndroidBackgrounded("resumeFallback");
+        }
+        notifyAndroidForegrounded();
     }
 
     private boolean isAllowedAppAsset(Uri uri) {

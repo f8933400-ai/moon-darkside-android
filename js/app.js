@@ -57,6 +57,27 @@
     function setAppMode(mode){appMode=mode; prefs.lastAppMode=mode; if(prefs.resetToCover===false)safeSavePrefs("记录应用模式"); applyAppMode();}
     function applyAppMode(){const cover=appMode!=="journal"; const app=document.querySelector(".app"); document.getElementById("coverApp").style.display=cover?"flex":"none"; app.style.display=cover?"none":""; document.getElementById("disclaimerBackdrop").style.display=cover?"none":"flex"; document.getElementById("lockBackdrop").style.display="none"; if(cover){renderLedger();} else {startDisclaimer(); startLock();}}
     function promptArrivalIfReady(){if(typeof window.maybeShowArrivalOnEnter==="function")setTimeout(()=>window.maybeShowArrivalOnEnter(),0);}
+    let androidBackgroundPending=false;
+    function shouldReturnCoverOnBackground(){return !!prefs&&prefs.resetToCover!==false;}
+    function closeJournalOverlaysForCover(){
+      closeDrawer();
+      closeMenu();
+      document.querySelectorAll(".modal-backdrop").forEach(modal=>{if(modal.id!=="coverSettingsModal")modal.style.display="none";});
+      const disclaimer=document.getElementById("disclaimerBackdrop");
+      if(disclaimer)disclaimer.style.display="none";
+      const lock=document.getElementById("lockBackdrop");
+      if(lock)lock.style.display="none";
+    }
+    function returnToCoverForAndroidBackground(reason){
+      if(!prefs){androidBackgroundPending=true; return false;}
+      if(!shouldReturnCoverOnBackground())return false;
+      closeJournalOverlaysForCover();
+      if(appMode!=="cover")setAppMode("cover");
+      else renderLedger();
+      return true;
+    }
+    window.__moonAndroidAppBackgrounded=function(reason){returnToCoverForAndroidBackground(reason||"android");};
+    window.__moonAndroidAppForegrounded=function(){if(androidBackgroundPending){androidBackgroundPending=false; returnToCoverForAndroidBackground("foregroundPending");}};
     window.forceCoverMode=function(){if(prefs.resetToCover!==false)setAppMode("cover");};
     window.showRoomMenu=function(e,roomId){const r=data.rooms.find(x=>x.id===roomId); const noun=isPrivateRoom(r)?term("privateRoom"):term("room"); showMenu(e,[{label:`改名 / 修改${noun}`,action:()=>editRoom(roomId)},{label:`删除${noun}`,danger:true,action:()=>deleteRoom(roomId)}]);};
     window.showMemberMenu=function(e,memberId){showMenu(e,[{label:`打开${term("privateRoom")}`,action:()=>openPrivateWith(memberId)},{label:`编辑${term("member")}`,action:()=>editMember(memberId)},{label:`删除${term("member")}`,danger:true,action:()=>deleteMember(memberId)}]);};
@@ -584,8 +605,11 @@
       }
     }
     function clearLockCredentials(){prefs.lockHash=""; prefs.lockKdf=null; prefs.useBiometric=false; prefs.webauthnCredentialId="";}
-    async function startLock(){const locked=hasLockCredential(); if(!locked&&prefs.useBiometric){prefs.useBiometric=false; prefs.webauthnCredentialId=""; try{await savePrefs();}catch(err){console.warn("failed to clear biometric without lock password",err);}} document.getElementById("lockBackdrop").style.display=locked?"flex":"none"; let bio=false; if(locked&&prefs.useBiometric){if(window.MoonBridge?.authenticate)bio=true; else if(prefs.webauthnCredentialId&&await webauthnSupported())bio=true;} document.getElementById("biometricUnlockBtn").style.display=bio?"inline-block":"none"; if(locked)setTimeout(()=>document.getElementById("unlockPassword").focus(),80);}
-    async function unlockWithPassword(){const input=document.getElementById("unlockPassword"); if(!hasLockCredential()){document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady(); return;} let result={ok:false,legacy:false}; try{result=await verifyLockPassword(input.value);}catch(err){console.error("lock password verification failed",err);} if(result.ok){if(result.legacy)await migrateLegacyLockHashIfNeeded(input.value); input.value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();} else {alert("密码不正确。"); input.select();}}
+    function androidBiometricBridge(){const bridge=window.MoonAndroidBiometric; return bridge&&typeof bridge.authenticate==="function"?bridge:null;}
+    function androidBiometricAvailable(){const bridge=androidBiometricBridge(); if(!bridge)return false; if(typeof bridge.isAvailable!=="function")return true; try{return !!bridge.isAvailable();}catch(err){console.warn("Android biometric availability failed",err); return false;}}
+    async function startLock(){const locked=hasLockCredential(); if(!locked&&prefs.useBiometric){prefs.useBiometric=false; prefs.webauthnCredentialId=""; try{await savePrefs();}catch(err){console.warn("failed to clear biometric without lock password",err);}} document.getElementById("lockBackdrop").style.display=locked?"flex":"none"; let bio=false; if(locked&&prefs.useBiometric){if(androidBiometricBridge())bio=true; else if(window.MoonBridge?.authenticate)bio=true; else if(prefs.webauthnCredentialId&&await webauthnSupported())bio=true;} document.getElementById("biometricUnlockBtn").style.display=bio?"inline-block":"none"; if(locked)setTimeout(()=>document.getElementById("unlockPassword").focus(),80);}
+    function finishUnlockSuccess(){document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();}
+    async function unlockWithPassword(){const input=document.getElementById("unlockPassword"); if(!hasLockCredential()){finishUnlockSuccess(); return;} let result={ok:false,legacy:false}; try{result=await verifyLockPassword(input.value);}catch(err){console.error("lock password verification failed",err);} if(result.ok){if(result.legacy)await migrateLegacyLockHashIfNeeded(input.value); finishUnlockSuccess();} else {alert("密码不正确。"); input.select();}}
     async function saveLockSettings(){
       const previousPrefs=JSON.parse(JSON.stringify(prefs||{}));
       const restoreLockPrefs=()=>{prefs=previousPrefs; document.getElementById("useBiometric").checked=!!prefs.useBiometric;};
@@ -605,7 +629,16 @@
         await saveLockPrefs();
         return;
       }
-      if(wantBio&&!window.MoonBridge?.authenticate){
+      if(wantBio&&androidBiometricBridge()){
+        if(!androidBiometricAvailable()){
+          alert("当前 Android 设备未检测到可用的系统生物识别，请使用密码解锁。");
+          document.getElementById("useBiometric").checked=false;
+          prefs.useBiometric=false;
+          if(await saveLockPrefs())document.getElementById("newLockPassword").value="";
+          return;
+        }
+        prefs.webauthnCredentialId="";
+      }else if(wantBio&&!window.MoonBridge?.authenticate){
         if(!await webauthnSupported()){
           alert("当前浏览器不支持平台生物识别。\n要求：HTTPS / localhost，且系统已设置指纹或面容。");
           document.getElementById("useBiometric").checked=false;
@@ -635,8 +668,27 @@
       }
     }
     async function disableLock(){if(!confirm("确定关闭进入密码锁吗？"))return; clearLockCredentials(); if(await savePrefs()){closeModal("lockSettingsModal"); document.getElementById("lockBackdrop").style.display="none";}}
-    async function requestBiometricUnlock(){if(!prefs.useBiometric){alert("请先在密码设置中允许使用系统指纹 / 面容解锁。");return;} if(!hasLockCredential()){clearLockCredentials(); await savePrefs(); alert("请先设置锁屏密码，再启用生物识别。");return;} if(window.MoonBridge?.authenticate){window.MoonBridge.authenticate();return;} if(prefs.webauthnCredentialId){if(!await webauthnSupported()){alert("当前浏览器不支持平台生物识别。");return;} try{await webauthnAuthenticate(prefs.webauthnCredentialId); document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();}catch(err){const name=err?.name||""; if(name==="NotAllowedError")alert("已取消或未通过验证。"); else if(name==="InvalidStateError")alert("找不到已注册的凭据，请用密码登入后重新启用。"); else alert("生物识别失败："+(err?.message||name||"未知错误"));} return;} alert("当前环境不支持系统指纹 / 面容解锁。");}
-    window.onMoonAuthResult=function(ok,message){if(ok){document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();} else if(message){alert(message);}};
+    const androidBiometricCallbacks={};
+    function requestAndroidBiometric(){
+      const bridge=androidBiometricBridge();
+      if(!bridge)return Promise.resolve({ok:false,message:"当前 Android 设备未检测到可用的系统生物识别，请使用密码解锁。"});
+      if(!androidBiometricAvailable())return Promise.resolve({ok:false,message:"当前 Android 设备未检测到可用的系统生物识别，请使用密码解锁。"});
+      return new Promise(resolve=>{
+        const requestId=`bio-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const timer=setTimeout(()=>{if(androidBiometricCallbacks[requestId]){delete androidBiometricCallbacks[requestId]; resolve({ok:false,message:"生物识别超时，请使用密码解锁。"});}},120000);
+        androidBiometricCallbacks[requestId]=result=>{clearTimeout(timer); resolve(result);};
+        try{bridge.authenticate(requestId);}
+        catch(err){clearTimeout(timer); delete androidBiometricCallbacks[requestId]; resolve({ok:false,message:err?.message||"生物识别启动失败，请使用密码解锁。"});}
+      });
+    }
+    window.__moonAndroidBiometricResult=function(requestId,ok,message){
+      const cb=androidBiometricCallbacks[requestId];
+      if(!cb)return;
+      delete androidBiometricCallbacks[requestId];
+      cb({ok:!!ok,message:String(message||"")});
+    };
+    async function requestBiometricUnlock(){if(!prefs.useBiometric){alert("请先在密码设置中允许使用系统指纹 / 面容解锁。");return;} if(!hasLockCredential()){clearLockCredentials(); await savePrefs(); alert("请先设置锁屏密码，再启用生物识别。");return;} if(androidBiometricBridge()){const result=await requestAndroidBiometric(); if(result.ok){finishUnlockSuccess();} else if(result.message){alert(result.message);} return;} if(window.MoonBridge?.authenticate){window.MoonBridge.authenticate();return;} if(prefs.webauthnCredentialId){if(!await webauthnSupported()){alert("当前浏览器不支持平台生物识别。");return;} try{await webauthnAuthenticate(prefs.webauthnCredentialId); finishUnlockSuccess();}catch(err){const name=err?.name||""; if(name==="NotAllowedError")alert("已取消或未通过验证。"); else if(name==="InvalidStateError")alert("找不到已注册的凭据，请用密码登入后重新启用。"); else alert("生物识别失败："+(err?.message||name||"未知错误"));} return;} alert("当前环境不支持系统指纹 / 面容解锁。");}
+    window.onMoonAuthResult=function(ok,message){if(ok){finishUnlockSuccess();} else if(message){alert(message);}};
     let disclaimerTimer=null;
     function startDisclaimer(){const btn=document.getElementById("enterBtn"); if(disclaimerTimer){clearInterval(disclaimerTimer);disclaimerTimer=null;} let left=3; btn.disabled=true; btn.textContent=`请等待 ${left} 秒`; disclaimerTimer=setInterval(()=>{left-=1; if(left>0){btn.textContent=`请等待 ${left} 秒`; return;} clearInterval(disclaimerTimer); disclaimerTimer=null; btn.disabled=false; btn.textContent="我已了解，进入";},1000); btn.onclick=()=>{if(btn.disabled)return; document.getElementById("disclaimerBackdrop").style.display="none"; promptArrivalIfReady();};}
     async function runJournalIntervalTasks(){if(appMode!=="journal")return false; const changed=await closeDuePolls(); renderPolls(); renderChat(); renderHandoff(); if(changed)renderList(); return changed;}

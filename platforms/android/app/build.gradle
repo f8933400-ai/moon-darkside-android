@@ -74,5 +74,6 @@ tasks.configureEach { task ->
 }
 
 dependencies {
+    implementation "androidx.biometric:biometric:1.1.0"
     implementation "androidx.webkit:webkit:1.16.0"
 }

@@ -1,5 +1,18 @@
 # 发布说明
 
+## P7-03 Android 后台回首页 / 锁定 / 生物识别
+
+P7-03 修复 Android APK 灰度中剩余的后台返回和生物识别路径问题：
+
+- Android APK 新增 Activity lifecycle bridge，让“退出或切到后台后回到首页”在 `onUserLeaveHint`、`onPause`、`onStop` 和 `onResume` fallback 中生效。
+- 开启该选项后，从主记录切到后台再回到应用，会回到伪装层 / 本地账本首页。
+- 已设置锁屏密码时，再次进入主记录仍会走现有锁屏流程；未设置锁屏密码时只回首页，不强制显示锁屏。
+- Android APK 生物识别新增 `MoonAndroidBiometric` bridge，改走原生 AndroidX `BiometricPrompt`，不再在 APK 中落到 WebAuthn 浏览器不支持提示。
+- Web / PWA 浏览器版保留原 WebAuthn 生物识别路径。
+- 已重新生成 Android test APK 到 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，APK 不提交进 git。
+
+本轮没有修改主 data schema、localStorage key、IndexedDB schema、主 JSON / encrypted-json 内容语义、账本 JSON / CSV 语义、账本隔离、图片 hydrate / externalize、伪装账本入口逻辑或 `messageIntegrity`，也没有新增 npm、CDN、`type="module"`、云同步或远程 API。已完成的长弹窗滚动修复和 Android Downloads 导出保存修复保持不变。
+
 ## P7-02 Android 导出保存到 Downloads
 
 P7-02 修复 Android APK 灰度中导出只弹提示、不生成文件的问题：
