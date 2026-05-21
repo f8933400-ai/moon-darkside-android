@@ -1,4 +1,4 @@
-const CACHE_NAME = "moon-app-shell-v0.4.1-p7-01-modal-system";
+const CACHE_NAME = "moon-app-shell-v0.4.1-p7-02-downloads";
 
 const APP_SHELL = [
   "./",
@@ -15,6 +15,7 @@ const APP_SHELL = [
   "./js/integrity.js",
   "./js/migrate.js",
   "./js/storage.js",
+  "./js/downloads.js",
   "./js/imageMigration.js",
   "./js/imageHealth.js",
   "./js/features/backup-health-ui.js",

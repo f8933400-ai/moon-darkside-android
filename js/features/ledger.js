@@ -3,11 +3,8 @@ function ledgerFilenameStamp(date=new Date()){
   return `${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
 }
 
-function downloadLedgerFile(filename,type,text){
-  if(window.MoonBridge?.saveFile){
-    window.MoonBridge.saveFile(filename,type,text);
-    return;
-  }
+async function downloadLedgerFile(filename,type,text){
+  if(window.downloadTextFile)return window.downloadTextFile(filename,type,text);
   const blob=new Blob([text],{type});
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
@@ -15,6 +12,7 @@ function downloadLedgerFile(filename,type,text){
   a.download=filename;
   a.click();
   URL.revokeObjectURL(url);
+  return {ok:true,filename};
 }
 
 function ledgerCsvCell(value){
@@ -828,16 +826,16 @@ async function saveLedgerSettingsForImport(settings){
   }
 }
 
-function exportLedgerJson(){
+async function exportLedgerJson(){
   const backup=buildLedgerBackup(ledgerRecords||[],ledgerCurrentSettings());
-  downloadLedgerFile(`moon-ledger-backup-${ledgerFilenameStamp()}.json`,"application/json",JSON.stringify(backup,null,2));
+  return downloadLedgerFile(`moon-ledger-backup-${ledgerFilenameStamp()}.json`,"application/json",JSON.stringify(backup,null,2));
 }
 
-function exportLedgerCsv(){
+async function exportLedgerCsv(){
   const records=normalizeLedgerRecords(ledgerRecords||[]);
   const header=["date","type","amount","category","account","paymentMethod","note","createdAt","updatedAt"];
   const rows=records.map(record=>header.map(key=>ledgerCsvCell(record[key])).join(","));
-  downloadLedgerFile(`moon-ledger-${ledgerFilenameStamp()}.csv`,"text/csv;charset=utf-8",[header.join(","),...rows].join("\n"));
+  return downloadLedgerFile(`moon-ledger-${ledgerFilenameStamp()}.csv`,"text/csv;charset=utf-8",[header.join(","),...rows].join("\n"));
 }
 
 async function importLedgerJsonFile(file){

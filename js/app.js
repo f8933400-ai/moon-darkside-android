@@ -215,8 +215,8 @@
         ledgerMessage("ledgerInlineMessage","收支记录已删除。");
       }
     });
-    const ledgerExportJsonBtn=document.getElementById("ledgerExportJsonBtn"); if(ledgerExportJsonBtn)ledgerExportJsonBtn.onclick=()=>{if(window.exportLedgerJson){window.exportLedgerJson(); ledgerMessage("ledgerInlineMessage","账本 JSON 备份已开始导出。");}};
-    const ledgerExportCsvBtn=document.getElementById("ledgerExportCsvBtn"); if(ledgerExportCsvBtn)ledgerExportCsvBtn.onclick=()=>{if(window.exportLedgerCsv){window.exportLedgerCsv(); ledgerMessage("ledgerInlineMessage","CSV 表格已开始导出。");}};
+    const ledgerExportJsonBtn=document.getElementById("ledgerExportJsonBtn"); if(ledgerExportJsonBtn)ledgerExportJsonBtn.onclick=async()=>{if(window.exportLedgerJson){const result=await window.exportLedgerJson(); if(result?.ok)ledgerMessage("ledgerInlineMessage",result.path?`已保存到系统下载目录：${result.path}`:"账本 JSON 备份已开始导出。"); else if(result)ledgerMessage("ledgerInlineMessage","账本 JSON 备份保存失败。","error");}};
+    const ledgerExportCsvBtn=document.getElementById("ledgerExportCsvBtn"); if(ledgerExportCsvBtn)ledgerExportCsvBtn.onclick=async()=>{if(window.exportLedgerCsv){const result=await window.exportLedgerCsv(); if(result?.ok)ledgerMessage("ledgerInlineMessage",result.path?`已保存到系统下载目录：${result.path}`:"CSV 表格已开始导出。"); else if(result)ledgerMessage("ledgerInlineMessage","CSV 表格保存失败。","error");}};
     const ledgerImportJsonBtn=document.getElementById("ledgerImportJsonBtn"); const ledgerImportJsonInput=document.getElementById("ledgerImportJsonInput");
     if(ledgerImportJsonBtn&&ledgerImportJsonInput)ledgerImportJsonBtn.onclick=()=>{ledgerImportJsonInput.value=""; ledgerImportJsonInput.click();};
     if(ledgerImportJsonInput)ledgerImportJsonInput.onchange=()=>{const file=ledgerImportJsonInput.files?.[0]; ledgerImportJsonInput.value=""; window.importLedgerJsonFile&&window.importLedgerJsonFile(file);};

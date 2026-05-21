@@ -1,5 +1,18 @@
 # 发布说明
 
+## P7-02 Android 导出保存到 Downloads
+
+P7-02 修复 Android APK 灰度中导出只弹提示、不生成文件的问题：
+
+- Android APK 新增 `MoonAndroidDownloads` JS bridge，由 Web 导出流程把文件内容交给原生保存。
+- Android 10+ 使用 `MediaStore.Downloads` 写入系统公共“下载 / Download”目录；Android 9 及以下保留受权限保护的公共 Downloads 写入路径。
+- 主 JSON、encrypted-json、复盘 Markdown / TXT、账本 JSON、账本 CSV 和系统名片 PNG 导出都会优先走 Android 保存接口。
+- 保存成功后会提示 `已保存到系统下载目录：Download/xxx`，不再只显示“暂未接管下载”。
+- 普通桌面 Web / PWA 仍保留原有浏览器下载行为；普通聊天页不应误弹下载提示。
+- 已重新生成 Android test APK 到 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，APK 不提交进 git。
+
+本轮没有修改主 data schema、localStorage key、IndexedDB schema、主 JSON / encrypted-json 内容语义、账本 JSON / CSV 语义、账本隔离、图片 hydrate / externalize、伪装账本入口逻辑或 `messageIntegrity`，也没有新增 npm、CDN、`type="module"`、云同步或远程 API。
+
 ## P7-01 Android 移动端弹窗系统修复
 
 P7-01 修复 Android 灰度中发现的移动端长弹窗滚动、关闭和底部操作遮挡问题：

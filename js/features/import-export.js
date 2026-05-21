@@ -416,14 +416,17 @@
         const result=generateReviewExport(format);
         if(!result)return;
         if(!result.text.trim()){alert("没有可导出的内容。"); return;}
-        if(window.MoonBridge?.saveFile){window.MoonBridge.saveFile(result.filename,result.type,result.text); closeModal("exportModal"); return;}
-        const blob=new Blob([result.text],{type:result.type});
-        const url=URL.createObjectURL(blob);
-        const a=document.createElement("a");
-        a.href=url;
-        a.download=result.filename;
-        a.click();
-        URL.revokeObjectURL(url);
+        const saved=window.downloadTextFile?await window.downloadTextFile(result.filename,result.type,result.text):null;
+        if(saved&&!saved.ok)return;
+        if(!saved){
+          const blob=new Blob([result.text],{type:result.type});
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement("a");
+          a.href=url;
+          a.download=result.filename;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
         closeModal("exportModal");
         return;
       }
@@ -474,14 +477,17 @@
         const label=scope==="all"?"全部对话":(roomDisplayName(rooms[0])||"对话");
         filename=`月之暗面-${fileSafe(options.redacted?`${label}-脱敏`:label)}-${new Date().toISOString().slice(0,10)}.${result.ext}`;
       }
-      if(window.MoonBridge?.saveFile){window.MoonBridge.saveFile(filename,result.type,result.text); closeModal("exportModal"); clearEncryptedBackupPasswordFields(); updateEncryptedBackupOptionsVisibility(); return;}
-      const blob=new Blob([result.text],{type:result.type});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement("a");
-      a.href=url;
-      a.download=filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      const saved=window.downloadTextFile?await window.downloadTextFile(filename,result.type,result.text):null;
+      if(saved&&!saved.ok)return;
+      if(!saved){
+        const blob=new Blob([result.text],{type:result.type});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement("a");
+        a.href=url;
+        a.download=filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
       closeModal("exportModal");
       clearEncryptedBackupPasswordFields();
       updateEncryptedBackupOptionsVisibility();
