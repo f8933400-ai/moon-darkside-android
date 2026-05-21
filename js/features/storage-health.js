@@ -241,8 +241,11 @@
 
       function openStorageHealthModal(){
         document.body.classList.remove("drawer-open");
-        const modal=byId("storageHealthModal");
-        if(modal)modal.style.display="flex";
+        if(typeof window.openModal==="function")window.openModal("storageHealthModal");
+        else {
+          const modal=byId("storageHealthModal");
+          if(modal)modal.style.display="flex";
+        }
         renderStorageHealthStats(null);
         runStorageHealthCheckUi();
       }

@@ -299,13 +299,19 @@
         resetBackupHealthUi();
         document.body.classList.remove("drawer-open");
         if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels();
-        const modal=byId("backupHealthModal");
-        if(modal)modal.style.display="flex";
+        if(typeof window.openModal==="function")window.openModal("backupHealthModal");
+        else {
+          const modal=byId("backupHealthModal");
+          if(modal)modal.style.display="flex";
+        }
       }
 
       function closeBackupHealthModal(){
-        const modal=byId("backupHealthModal");
-        if(modal)modal.style.display="none";
+        if(typeof window.closeModal==="function")window.closeModal("backupHealthModal");
+        else {
+          const modal=byId("backupHealthModal");
+          if(modal)modal.style.display="none";
+        }
       }
 
       window.openBackupHealthModal=openBackupHealthModal;

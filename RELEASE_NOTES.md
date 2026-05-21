@@ -1,5 +1,17 @@
 # 发布说明
 
+## P7-01 Android 移动端弹窗系统修复
+
+P7-01 修复 Android 灰度中发现的移动端长弹窗滚动、关闭和底部操作遮挡问题：
+
+- “时间线 / 回顾”和“高级搜索”改为固定标题区 + 独立滚动内容区，320px / 375px 宽度下可滑动、按钮可触达且无横向溢出。
+- 移除会盖住内容的全局 sticky 底部操作区，避免出现多个关闭入口或底部按钮与内容重叠。
+- 两个重点弹窗只保留一个明确的右上关闭按钮；高级搜索窄屏打开时不再自动弹出键盘。
+- 本地存储状态和备份健康检查接回统一弹窗打开 / 关闭路径，打开时会重置滚动位置。
+- 已重新生成 Android test APK 到 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，APK 不提交进 git。
+
+本轮没有修改数据结构、localStorage key、IndexedDB schema、主 JSON / encrypted-json 语义、账本 JSON / CSV 语义、账本隔离、图片 hydrate / externalize、伪装账本入口逻辑或 `messageIntegrity`，也没有新增 npm、CDN、`type="module"` 或联网请求。
+
 ## P6-08 v0.4.1 package-test 封版
 
 P6-08 完成 `v0.4.1-package-test` 封版记录，并准备外部 package-test 归档包：

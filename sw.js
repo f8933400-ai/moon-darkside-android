@@ -1,4 +1,4 @@
-const CACHE_NAME = "moon-app-shell-v0.4.1-p7-01";
+const CACHE_NAME = "moon-app-shell-v0.4.1-p7-01-modal-system";
 
 const APP_SHELL = [
   "./",

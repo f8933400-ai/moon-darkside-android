@@ -147,7 +147,8 @@
           const modal=document.getElementById("advancedSearchModal");
           if(modal)modal.style.display="flex";
         }
-        setTimeout(()=>keyword?.focus(),0);
+        const narrow=window.matchMedia?.("(max-width: 760px)")?.matches;
+        if(!narrow)setTimeout(()=>keyword?.focus(),0);
       }
       function closeAdvancedSearchModal(){
         if(typeof window.closeModal==="function")window.closeModal("advancedSearchModal");

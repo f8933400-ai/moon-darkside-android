@@ -50,6 +50,8 @@
       modal.style.display="flex";
       const panel=modal.querySelector(".modal");
       if(panel)panel.scrollTop=0;
+      const scrollBody=modal.querySelector(".modal-scroll-body");
+      if(scrollBody)scrollBody.scrollTop=0;
     }
     window.openModal=openModal;
     function setAppMode(mode){appMode=mode; prefs.lastAppMode=mode; if(prefs.resetToCover===false)safeSavePrefs("记录应用模式"); applyAppMode();}
@@ -263,13 +265,11 @@
     const advancedSearchBtn=document.getElementById("advancedSearchBtn");
     const advancedSearchRunBtn=document.getElementById("advancedSearchRunBtn");
     const advancedSearchResetBtn=document.getElementById("advancedSearchResetBtn");
-    const advancedSearchCloseBtn=document.getElementById("advancedSearchCloseBtn");
     const advancedSearchResults=document.getElementById("advancedSearchResults");
     const advancedSearchKeyword=document.getElementById("advancedSearchKeyword");
     if(advancedSearchBtn)advancedSearchBtn.onclick=()=>window.openAdvancedSearchModal&&window.openAdvancedSearchModal();
     if(advancedSearchRunBtn)advancedSearchRunBtn.onclick=()=>{if(!window.collectAdvancedSearchFilters||!window.collectSearchResults||!window.renderAdvancedSearchResults)return; const filters=window.collectAdvancedSearchFilters(); const results=window.collectSearchResults(filters); window.renderAdvancedSearchResults(results);};
     if(advancedSearchResetBtn)advancedSearchResetBtn.onclick=()=>window.resetAdvancedSearchFilters&&window.resetAdvancedSearchFilters();
-    if(advancedSearchCloseBtn)advancedSearchCloseBtn.onclick=()=>window.closeAdvancedSearchModal&&window.closeAdvancedSearchModal();
     if(advancedSearchKeyword)advancedSearchKeyword.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault(); advancedSearchRunBtn?.click();}});
     if(advancedSearchResults)advancedSearchResults.addEventListener("click",e=>{const btn=e.target.closest("[data-search-type][data-search-id]"); if(!btn||!advancedSearchResults.contains(btn))return; window.jumpToSearchResult&&window.jumpToSearchResult(btn.dataset.searchType,btn.dataset.searchId);});
     const timelineBtn=document.getElementById("timelineBtn");
