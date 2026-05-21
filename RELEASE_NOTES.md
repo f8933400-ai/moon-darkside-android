@@ -1,5 +1,18 @@
 # 发布说明
 
+## P7-04 v2 Android 主记录后台锁定状态
+
+P7-04 v2 继续修复 Android APK 中开启“退出或切到后台后回到首页”并设置密码时，主记录后台返回后没有稳定锁定的问题：
+
+- 主记录入口新增 `requestEnterJournal()` 守卫，不再先切到 `journal` 再显示锁屏。
+- `journalAccessLocked` 现在明确表示“主记录访问需要解锁”；回首页、刷新账本首页、关闭弹窗或 `appMode="cover"` 不会清除该状态。
+- Android 后台回调会在回首页前先 `requireJournalUnlock()`；再次进入主记录时必须先密码或有效解锁。
+- Android `onPause()` 也设置 native pending fallback，避免 WebView 后台阶段未执行 JS 时，`onResume()` 无法补发锁定逻辑。
+- 增加不含用户数据的灰度调试日志，便于确认 lifecycle 和锁定状态。
+- 已重新生成 Android test APK 到 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，APK 不提交进 git。
+
+本轮没有修改主 data schema、localStorage key、IndexedDB schema、主 JSON / encrypted-json 内容语义、账本 JSON / CSV 语义、账本隔离、图片 hydrate / externalize、伪装账本入口逻辑或 `messageIntegrity`，也没有新增 npm、CDN、`type="module"`、云同步或远程 API。长弹窗滚动修复和 Android Downloads 导出保存修复保持不变。
+
 ## P7-04 Android 后台回首页后的锁定状态
 
 P7-04 修复 Android APK 中开启“退出或切到后台后回到首页”并已设置密码时，后台返回后主记录访问没有稳定进入 locked 状态的问题：

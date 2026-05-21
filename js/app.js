@@ -1,7 +1,7 @@
     /* ── Tauri 桌面端桥接：让现有 MoonBridge 接口在 Tauri 下生效 ── */
     (function setupTauriBridge(){if(!window.__TAURI_INTERNALS__)return; const invoke=window.__TAURI_INTERNALS__.invoke; if(typeof invoke!=="function")return; window.MoonBridge=window.MoonBridge||{}; window.MoonBridge.authenticate=function(){invoke("moon_authenticate").then(()=>{window.onMoonAuthResult&&window.onMoonAuthResult(true,"");}).catch(err=>{const msg=String(err?.message||err||""); const display=/cancel|user.*cancel|取消/i.test(msg)?"已取消":("验证失败："+(msg||"未知错误")); window.onMoonAuthResult&&window.onMoonAuthResult(false,display);});};})();
     (function setupViewportHeight(){const sync=()=>{document.body.style.setProperty("--app-height",`${window.innerHeight}px`);}; sync(); window.addEventListener("resize",sync,{passive:true}); window.addEventListener("orientationchange",()=>setTimeout(sync,240),{passive:true}); if(window.visualViewport)window.visualViewport.addEventListener("resize",sync,{passive:true});})();
-    let data; let prefs; let ledgerRecords=[]; let ledgerSettings={categories:[],budgets:[],defaultViewMode:"month"}; let editingLedgerId=null; let editingLedgerCategoryId=null; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover"; let journalAccessLocked=true;
+    let data; let prefs; let ledgerRecords=[]; let ledgerSettings={categories:[],budgets:[],defaultViewMode:"month"}; let editingLedgerId=null; let editingLedgerCategoryId=null; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover"; let journalAccessLocked=true; let pendingJournalEntryReason="";
     const list=document.getElementById("list"), messages=document.getElementById("messages"), roomName=document.getElementById("roomName"), roomDesc=document.getElementById("roomDesc"), speaker=document.getElementById("speaker"), kind=document.getElementById("kind"), search=document.getElementById("search"), fontSize=document.getElementById("fontSize"), fontSizeValue=document.getElementById("fontSizeValue"), themeBtn=document.getElementById("themeBtn"), contextMenu=document.getElementById("contextMenu"), imageInput=document.getElementById("imageInput"), importInput=document.getElementById("importInput"), memberAvatarInput=document.getElementById("memberAvatarInput"), roomBgInput=document.getElementById("roomBgInput"), drawerBtn=document.getElementById("drawerBtn"), drawerBackdrop=document.getElementById("drawerBackdrop");
     function showMenu(e,items){e.preventDefault(); e.stopPropagation(); contextMenu.innerHTML=items.map((item,i)=>`<button class="${item.danger?"danger-action":""}" data-i="${i}">${esc(item.label)}</button>`).join(""); contextMenu.style.display="block"; const rect=contextMenu.getBoundingClientRect(); contextMenu.style.left=Math.min(e.clientX,window.innerWidth-rect.width-8)+"px"; contextMenu.style.top=Math.min(e.clientY,window.innerHeight-rect.height-8)+"px"; contextMenu.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{const item=items[Number(btn.dataset.i)]; closeMenu(); item.action();});}
     function closeMenu(){contextMenu.style.display="none"; contextMenu.innerHTML="";}
@@ -54,11 +54,13 @@
       if(scrollBody)scrollBody.scrollTop=0;
     }
     window.openModal=openModal;
+    function lockDebug(message,detail={}){try{console.debug("[lock]",message,detail);}catch{}}
     function hasJournalLockCredential(){return !!prefs&&hasLockCredential();}
-    function requireJournalUnlock(){journalAccessLocked=hasJournalLockCredential();}
-    function clearJournalUnlockRequirement(){journalAccessLocked=false;}
+    function isJournalAccessLocked(){return journalAccessLocked===true;}
+    function requireJournalUnlock(reason="lock"){journalAccessLocked=hasJournalLockCredential(); lockDebug(journalAccessLocked?"journal access locked":"journal lock skipped",{reason,hasCredential:hasJournalLockCredential(),appMode});}
+    function clearJournalUnlockRequirement(reason="unlock"){journalAccessLocked=false; pendingJournalEntryReason=""; lockDebug("journal access unlocked",{reason,appMode});}
     function journalRequiresUnlock(){return hasJournalLockCredential()&&journalAccessLocked;}
-    function setAppMode(mode){if(mode==="cover")requireJournalUnlock(); appMode=mode; prefs.lastAppMode=mode; if(prefs.resetToCover===false)safeSavePrefs("记录应用模式"); applyAppMode();}
+    function setAppMode(mode){if(mode==="cover")requireJournalUnlock("setAppMode:cover"); appMode=mode; prefs.lastAppMode=mode; if(prefs.resetToCover===false)safeSavePrefs("记录应用模式"); applyAppMode();}
     function applyAppMode(){const cover=appMode!=="journal"; const app=document.querySelector(".app"); document.getElementById("coverApp").style.display=cover?"flex":"none"; app.style.display=cover?"none":""; document.getElementById("disclaimerBackdrop").style.display=cover?"none":"flex"; document.getElementById("lockBackdrop").style.display="none"; if(cover){renderLedger();} else {startDisclaimer(); startLock();}}
     function promptArrivalIfReady(){if(typeof window.maybeShowArrivalOnEnter==="function")setTimeout(()=>window.maybeShowArrivalOnEnter(),0);}
     let androidBackgroundPending=false;
@@ -74,9 +76,11 @@
     }
     function returnToCoverForAndroidBackground(reason){
       if(!prefs){androidBackgroundPending=true; return false;}
-      if(!shouldReturnCoverOnBackground())return false;
-      if(hasJournalLockCredential())requireJournalUnlock();
-      else clearJournalUnlockRequirement();
+      const shouldReturn=shouldReturnCoverOnBackground();
+      lockDebug("android background received",{reason,shouldReturn,hasCredential:hasJournalLockCredential(),locked:isJournalAccessLocked(),appMode});
+      if(!shouldReturn)return false;
+      if(hasJournalLockCredential())requireJournalUnlock(`android-background:${reason||"unknown"}`);
+      else clearJournalUnlockRequirement(`android-background-no-credential:${reason||"unknown"}`);
       closeJournalOverlaysForCover();
       if(appMode!=="cover")setAppMode("cover");
       else renderLedger();
@@ -163,7 +167,15 @@
     document.getElementById("coverSettingsBtn").onclick=()=>openModal("coverSettingsModal");
     const enterJournalBtn=document.getElementById("enterJournalBtn"); let enterHoldTimer=null; let enterHoldReady=false; let enterPressing=false;
     function showCoverDeclaration(){alert("月之暗面 v2\n本地记账记录工具。");}
-    function enterJournalFromCover(){closeModal("coverSettingsModal"); if(!hasJournalLockCredential())clearJournalUnlockRequirement(); setAppMode("journal");}
+    function enterJournalActually(reason="enter"){pendingJournalEntryReason=""; lockDebug("requestEnterJournal allowed",{reason,locked:isJournalAccessLocked(),appMode}); setAppMode("journal");}
+    function showJournalLock(reason="enter"){pendingJournalEntryReason=reason; lockDebug("requestEnterJournal blocked",{reason,locked:isJournalAccessLocked(),appMode}); startLock();}
+    function requestEnterJournal(reason="enter"){
+      if(!hasJournalLockCredential()){clearJournalUnlockRequirement(`enter-no-credential:${reason}`); enterJournalActually(reason); return true;}
+      if(isJournalAccessLocked()){showJournalLock(reason); return false;}
+      enterJournalActually(reason);
+      return true;
+    }
+    function enterJournalFromCover(){closeModal("coverSettingsModal"); requestEnterJournal("cover-hidden-entry");}
     function beginHiddenEntry(e){e?.preventDefault(); if(enterPressing)return; enterPressing=true; enterHoldReady=false; clearTimeout(enterHoldTimer); enterHoldTimer=setTimeout(()=>{enterHoldReady=true; enterPressing=false; enterJournalFromCover();},1200);}
     function endHiddenEntry(e){e?.preventDefault(); clearTimeout(enterHoldTimer); if(enterPressing&&!enterHoldReady)showCoverDeclaration(); enterPressing=false; enterHoldReady=false;}
     enterJournalBtn.addEventListener("pointerdown",beginHiddenEntry);
@@ -615,7 +627,7 @@
     function androidBiometricBridge(){const bridge=window.MoonAndroidBiometric; return bridge&&typeof bridge.authenticate==="function"?bridge:null;}
     function androidBiometricAvailable(){const bridge=androidBiometricBridge(); if(!bridge)return false; if(typeof bridge.isAvailable!=="function")return true; try{return !!bridge.isAvailable();}catch(err){console.warn("Android biometric availability failed",err); return false;}}
     async function startLock(){const hasCredential=hasLockCredential(); if(!hasCredential){clearJournalUnlockRequirement(); if(prefs.useBiometric){prefs.useBiometric=false; prefs.webauthnCredentialId=""; try{await savePrefs();}catch(err){console.warn("failed to clear biometric without lock password",err);}}} const locked=journalRequiresUnlock(); document.getElementById("lockBackdrop").style.display=locked?"flex":"none"; let bio=false; if(locked&&prefs.useBiometric){if(androidBiometricBridge())bio=true; else if(window.MoonBridge?.authenticate)bio=true; else if(prefs.webauthnCredentialId&&await webauthnSupported())bio=true;} document.getElementById("biometricUnlockBtn").style.display=bio?"inline-block":"none"; if(locked)setTimeout(()=>document.getElementById("unlockPassword").focus(),80);}
-    function finishUnlockSuccess(){clearJournalUnlockRequirement(); document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; promptArrivalIfReady();}
+    function finishUnlockSuccess(){const pendingReason=pendingJournalEntryReason; clearJournalUnlockRequirement("unlock-success"); document.getElementById("unlockPassword").value=""; document.getElementById("lockBackdrop").style.display="none"; if(pendingReason&&appMode!=="journal"){enterJournalActually(`unlock:${pendingReason}`); return;} promptArrivalIfReady();}
     async function unlockWithPassword(){const input=document.getElementById("unlockPassword"); if(!hasLockCredential()){finishUnlockSuccess(); return;} let result={ok:false,legacy:false}; try{result=await verifyLockPassword(input.value);}catch(err){console.error("lock password verification failed",err);} if(result.ok){if(result.legacy)await migrateLegacyLockHashIfNeeded(input.value); finishUnlockSuccess();} else {alert("密码不正确。"); input.select();}}
     async function saveLockSettings(){
       const previousPrefs=JSON.parse(JSON.stringify(prefs||{}));

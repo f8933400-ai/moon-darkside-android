@@ -366,7 +366,8 @@ public class MainActivity extends FragmentActivity {
         try {
             view.post(() -> {
                 try {
-                    view.evaluateJavascript("(function(){try{" + script + ";}catch(err){console.error(err);}})();", null);
+                    view.evaluateJavascript("(function(){try{" + script + ";}catch(err){console.error(err);}})();",
+                            value -> Log.d(TAG, "evaluateJavascript delivered"));
                 } catch (Exception err) {
                     Log.w(TAG, "evaluateJavascript failed", err);
                 }
@@ -377,15 +378,18 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void notifyAndroidBackgrounded(String reason) {
+        Log.d(TAG, "notify backgrounded: " + reason);
         runJavascript("window.__moonAndroidAppBackgrounded&&window.__moonAndroidAppBackgrounded(" + jsonString(reason) + ")");
     }
 
     private void notifyAndroidForegrounded() {
+        Log.d(TAG, "notify foregrounded");
         runJavascript("window.__moonAndroidAppForegrounded&&window.__moonAndroidAppForegrounded()");
     }
 
     @Override
     protected void onUserLeaveHint() {
+        Log.d(TAG, "onUserLeaveHint: pendingBackgroundHomeReturn=true");
         pendingBackgroundHomeReturn = true;
         notifyAndroidBackgrounded("userLeaveHint");
         super.onUserLeaveHint();
@@ -393,12 +397,15 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     protected void onPause() {
+        Log.d(TAG, "onPause: pendingBackgroundHomeReturn=true");
+        pendingBackgroundHomeReturn = true;
         notifyAndroidBackgrounded("pause");
         super.onPause();
     }
 
     @Override
     protected void onStop() {
+        Log.d(TAG, "onStop: pendingBackgroundHomeReturn=true");
         pendingBackgroundHomeReturn = true;
         notifyAndroidBackgrounded("stop");
         super.onStop();
@@ -407,6 +414,7 @@ public class MainActivity extends FragmentActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        Log.d(TAG, "onResume: pendingBackgroundHomeReturn=" + pendingBackgroundHomeReturn);
         if (pendingBackgroundHomeReturn) {
             pendingBackgroundHomeReturn = false;
             notifyAndroidBackgrounded("resumeFallback");
