@@ -1,5 +1,17 @@
 # 发布说明
 
+## P7-04 Android 后台回首页后的锁定状态
+
+P7-04 修复 Android APK 中开启“退出或切到后台后回到首页”并已设置密码时，后台返回后主记录访问没有稳定进入 locked 状态的问题：
+
+- Web 层新增内存级 `journalAccessLocked` 会话状态，区分“是否设置了密码”和“当前主记录访问是否已经解锁”。
+- Android lifecycle 回调触发后台回首页时，如果存在 `lockKdf` 或 legacy `lockHash`，会先标记主记录访问需要解锁，再回到伪装首页。
+- 回首页、刷新首页账本或关闭弹窗不会清除 locked 状态；只有密码 / 生物识别解锁成功或清除锁屏凭据才会清除。
+- 从伪装首页重新进入主记录时，会通过现有锁屏入口检查 locked 状态，已设置密码时必须先解锁。
+- 已重新生成 Android test APK 到 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，APK 不提交进 git。
+
+本轮没有修改主 data schema、localStorage key、IndexedDB schema、主 JSON / encrypted-json 内容语义、账本 JSON / CSV 语义、账本隔离、图片 hydrate / externalize、伪装账本入口逻辑或 `messageIntegrity`，也没有新增 npm、CDN、`type="module"`、云同步或远程 API。长弹窗滚动修复、Android Downloads 导出保存修复和 Android BiometricPrompt bridge 保持不变。
+
 ## P7-03 Android 后台回首页 / 锁定 / 生物识别
 
 P7-03 修复 Android APK 灰度中剩余的后台返回和生物识别路径问题：
