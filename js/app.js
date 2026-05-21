@@ -40,7 +40,18 @@
       (data.messages||[]).forEach(m=>{if(m.roomId===roomId&&m.imageId)ids.push(m.imageId);});
       return ids;
     }
-    window.selectRoom=function(id){const r=data.rooms.find(x=>x.id===id); currentRoomId=id; if(r&&isPrivateRoom(r))maybeShowPrivateRoomNotice(); render(); closeDrawer();}; window.closeModal=function(id){document.getElementById(id).style.display="none";}; function openModal(id){closeDrawer(); closeMenu(); document.getElementById(id).style.display="flex";}
+    window.selectRoom=function(id){const r=data.rooms.find(x=>x.id===id); currentRoomId=id; if(r&&isPrivateRoom(r))maybeShowPrivateRoomNotice(); render(); closeDrawer();};
+    window.closeModal=function(id){const modal=document.getElementById(id); if(modal)modal.style.display="none";};
+    function openModal(id){
+      closeDrawer();
+      closeMenu();
+      const modal=document.getElementById(id);
+      if(!modal)return;
+      modal.style.display="flex";
+      const panel=modal.querySelector(".modal");
+      if(panel)panel.scrollTop=0;
+    }
+    window.openModal=openModal;
     function setAppMode(mode){appMode=mode; prefs.lastAppMode=mode; if(prefs.resetToCover===false)safeSavePrefs("记录应用模式"); applyAppMode();}
     function applyAppMode(){const cover=appMode!=="journal"; const app=document.querySelector(".app"); document.getElementById("coverApp").style.display=cover?"flex":"none"; app.style.display=cover?"none":""; document.getElementById("disclaimerBackdrop").style.display=cover?"none":"flex"; document.getElementById("lockBackdrop").style.display="none"; if(cover){renderLedger();} else {startDisclaimer(); startLock();}}
     function promptArrivalIfReady(){if(typeof window.maybeShowArrivalOnEnter==="function")setTimeout(()=>window.maybeShowArrivalOnEnter(),0);}
