@@ -1,5 +1,19 @@
 # 发布说明
 
+## P7-05 Android 文件选择器后台回首页豁免
+
+P7-05 修复 Android APK 中系统文件选择器误触发“退出或切到后台后回到首页”的问题：
+
+- Android `onShowFileChooser()` 启动文件选择器时会标记为应用主动外部交互，选择完成、取消或异常返回时都会清理该状态。
+- 文件选择器期间触发的 `onPause()` / `onStop()` / `onResume()` 不再执行后台回首页，也不会设置主记录 locked。
+- Web 层新增 external interaction guard，收到 Android 外部交互通知后会跳过后台回首页处理。
+- 发送图片选择完成后会保持主记录上下文，继续显示“发送图片”弹窗；取消选择也不会跳到伪装账本首页。
+- 成员头像、房间背景、主 JSON / encrypted-json / 账本 JSON 等文件选择入口同样受 `onShowFileChooser()` 保护。
+- 真正按 Home、最近任务或锁屏离开应用时，仍按 `prefs.resetToCover` 回到伪装首页；已设置锁屏密码时再次进入主记录仍需解锁。
+- 已重新生成 Android test APK 到 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，APK 不提交进 git。
+
+本轮没有修改主 data schema、localStorage key、IndexedDB schema、主 JSON / encrypted-json 内容语义、账本 JSON / CSV 语义、账本隔离、图片 hydrate / externalize、伪装账本入口逻辑或 `messageIntegrity`，也没有新增 npm、CDN、`type="module"`、云同步或远程 API。长弹窗滚动修复、Android Downloads 导出保存修复和 P7-04 主记录后台锁定修复保持不变。
+
 ## P7-04 v2 Android 主记录后台锁定状态
 
 P7-04 v2 继续修复 Android APK 中开启“退出或切到后台后回到首页”并设置密码时，主记录后台返回后没有稳定锁定的问题：

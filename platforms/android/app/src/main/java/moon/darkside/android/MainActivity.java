@@ -55,6 +55,9 @@ public class MainActivity extends FragmentActivity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private boolean pendingBackgroundHomeReturn = false;
+    private boolean appInitiatedExternalActivity = false;
+    private boolean suppressNextBackgroundHomeReturn = false;
+    private boolean externalInteractionResumeObserved = false;
 
     private final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
             .setDomain(APP_HOST)
@@ -387,8 +390,56 @@ public class MainActivity extends FragmentActivity {
         runJavascript("window.__moonAndroidAppForegrounded&&window.__moonAndroidAppForegrounded()");
     }
 
+    private void notifyExternalInteractionStarted(String reason) {
+        runJavascript("window.__moonAndroidExternalInteractionStarted&&window.__moonAndroidExternalInteractionStarted(" + jsonString(reason) + ")");
+    }
+
+    private void notifyExternalInteractionEnded(String reason) {
+        runJavascript("window.__moonAndroidExternalInteractionEnded&&window.__moonAndroidExternalInteractionEnded(" + jsonString(reason) + ")");
+    }
+
+    private void beginExternalInteraction(String reason) {
+        appInitiatedExternalActivity = true;
+        suppressNextBackgroundHomeReturn = true;
+        externalInteractionResumeObserved = false;
+        pendingBackgroundHomeReturn = false;
+        Log.d(TAG, "external interaction started: " + reason);
+        notifyExternalInteractionStarted(reason);
+    }
+
+    private void endExternalInteraction(String reason) {
+        if (!appInitiatedExternalActivity && !suppressNextBackgroundHomeReturn) {
+            Log.d(TAG, "external interaction end ignored: " + reason);
+            return;
+        }
+        appInitiatedExternalActivity = false;
+        pendingBackgroundHomeReturn = false;
+        suppressNextBackgroundHomeReturn = !externalInteractionResumeObserved;
+        externalInteractionResumeObserved = false;
+        Log.d(TAG, "external interaction ended: " + reason + ", suppressNextBackgroundHomeReturn=" + suppressNextBackgroundHomeReturn);
+        notifyExternalInteractionEnded(reason);
+    }
+
+    private boolean suppressBackgroundHomeForExternalInteraction(String reason, boolean isResume) {
+        if (!appInitiatedExternalActivity && !suppressNextBackgroundHomeReturn) return false;
+        Log.d(TAG, "suppress background home: " + reason
+                + ", external=" + appInitiatedExternalActivity
+                + ", suppressNext=" + suppressNextBackgroundHomeReturn);
+        pendingBackgroundHomeReturn = false;
+        if (isResume) externalInteractionResumeObserved = true;
+        if (!appInitiatedExternalActivity) {
+            suppressNextBackgroundHomeReturn = false;
+            externalInteractionResumeObserved = false;
+        }
+        return true;
+    }
+
     @Override
     protected void onUserLeaveHint() {
+        if (suppressBackgroundHomeForExternalInteraction("userLeaveHint", false)) {
+            super.onUserLeaveHint();
+            return;
+        }
         Log.d(TAG, "onUserLeaveHint: pendingBackgroundHomeReturn=true");
         pendingBackgroundHomeReturn = true;
         notifyAndroidBackgrounded("userLeaveHint");
@@ -397,6 +448,10 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     protected void onPause() {
+        if (suppressBackgroundHomeForExternalInteraction("pause", false)) {
+            super.onPause();
+            return;
+        }
         Log.d(TAG, "onPause: pendingBackgroundHomeReturn=true");
         pendingBackgroundHomeReturn = true;
         notifyAndroidBackgrounded("pause");
@@ -405,6 +460,10 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     protected void onStop() {
+        if (suppressBackgroundHomeForExternalInteraction("stop", false)) {
+            super.onStop();
+            return;
+        }
         Log.d(TAG, "onStop: pendingBackgroundHomeReturn=true");
         pendingBackgroundHomeReturn = true;
         notifyAndroidBackgrounded("stop");
@@ -414,7 +473,13 @@ public class MainActivity extends FragmentActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        Log.d(TAG, "onResume: pendingBackgroundHomeReturn=" + pendingBackgroundHomeReturn);
+        Log.d(TAG, "onResume: pendingBackgroundHomeReturn=" + pendingBackgroundHomeReturn
+                + ", external=" + appInitiatedExternalActivity
+                + ", suppressNext=" + suppressNextBackgroundHomeReturn);
+        if (suppressBackgroundHomeForExternalInteraction("resume", true)) {
+            notifyAndroidForegrounded();
+            return;
+        }
         if (pendingBackgroundHomeReturn) {
             pendingBackgroundHomeReturn = false;
             notifyAndroidBackgrounded("resumeFallback");
@@ -455,10 +520,16 @@ public class MainActivity extends FragmentActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != FILE_CHOOSER_REQUEST) return;
-        if (filePathCallback == null) return;
-        Uri[] results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
-        filePathCallback.onReceiveValue(results);
-        filePathCallback = null;
+        try {
+            if (filePathCallback != null) {
+                Uri[] results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+                filePathCallback.onReceiveValue(results);
+            }
+            Log.d(TAG, "file chooser result handled");
+        } finally {
+            filePathCallback = null;
+            endExternalInteraction("fileChooser");
+        }
     }
 
     @Override
@@ -540,15 +611,24 @@ public class MainActivity extends FragmentActivity {
         public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> callback, FileChooserParams params) {
             if (filePathCallback != null) {
                 filePathCallback.onReceiveValue(null);
+                endExternalInteraction("fileChooserReplaced");
             }
             filePathCallback = callback;
-            Intent intent = params.createIntent();
             try {
+                Intent intent = params.createIntent();
+                beginExternalInteraction("fileChooser");
                 startActivityForResult(intent, FILE_CHOOSER_REQUEST);
             } catch (ActivityNotFoundException err) {
                 Log.w(TAG, "No Android file chooser available.", err);
                 filePathCallback.onReceiveValue(null);
                 filePathCallback = null;
+                endExternalInteraction("fileChooser");
+                return false;
+            } catch (RuntimeException err) {
+                Log.w(TAG, "Android file chooser failed.", err);
+                filePathCallback.onReceiveValue(null);
+                filePathCallback = null;
+                endExternalInteraction("fileChooser");
                 return false;
             }
             return true;

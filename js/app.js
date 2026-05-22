@@ -64,7 +64,17 @@
     function applyAppMode(){const cover=appMode!=="journal"; const app=document.querySelector(".app"); document.getElementById("coverApp").style.display=cover?"flex":"none"; app.style.display=cover?"none":""; document.getElementById("disclaimerBackdrop").style.display=cover?"none":"flex"; document.getElementById("lockBackdrop").style.display="none"; if(cover){renderLedger();} else {startDisclaimer(); startLock();}}
     function promptArrivalIfReady(){if(typeof window.maybeShowArrivalOnEnter==="function")setTimeout(()=>window.maybeShowArrivalOnEnter(),0);}
     let androidBackgroundPending=false;
+    let androidExternalInteractionDepth=0;
     function shouldReturnCoverOnBackground(){return !!prefs&&prefs.resetToCover!==false;}
+    function isAndroidExternalInteractionActive(){return androidExternalInteractionDepth>0;}
+    function beginAndroidExternalInteraction(reason){
+      androidExternalInteractionDepth+=1;
+      try{console.debug("[android] external interaction started",{reason,depth:androidExternalInteractionDepth});}catch{}
+    }
+    function endAndroidExternalInteraction(reason){
+      androidExternalInteractionDepth=Math.max(0,androidExternalInteractionDepth-1);
+      try{console.debug("[android] external interaction ended",{reason,depth:androidExternalInteractionDepth});}catch{}
+    }
     function closeJournalOverlaysForCover(){
       closeDrawer();
       closeMenu();
@@ -75,6 +85,10 @@
       if(lock)lock.style.display="none";
     }
     function returnToCoverForAndroidBackground(reason){
+      if(isAndroidExternalInteractionActive()){
+        try{console.debug("[android] skip background home during external interaction",{reason,depth:androidExternalInteractionDepth});}catch{}
+        return false;
+      }
       if(!prefs){androidBackgroundPending=true; return false;}
       const shouldReturn=shouldReturnCoverOnBackground();
       lockDebug("android background received",{reason,shouldReturn,hasCredential:hasJournalLockCredential(),locked:isJournalAccessLocked(),appMode});
@@ -86,6 +100,8 @@
       else renderLedger();
       return true;
     }
+    window.__moonAndroidExternalInteractionStarted=function(reason){beginAndroidExternalInteraction(reason||"external");};
+    window.__moonAndroidExternalInteractionEnded=function(reason){endAndroidExternalInteraction(reason||"external");};
     window.__moonAndroidAppBackgrounded=function(reason){returnToCoverForAndroidBackground(reason||"android");};
     window.__moonAndroidAppForegrounded=function(){if(androidBackgroundPending){androidBackgroundPending=false; returnToCoverForAndroidBackground("foregroundPending");}};
     window.forceCoverMode=function(){if(prefs.resetToCover!==false)setAppMode("cover");};
