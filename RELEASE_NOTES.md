@@ -1,5 +1,18 @@
 # 发布说明
 
+## P7-06 Android 键盘遮挡底部窗口修复
+
+P7-06 修复 Android APK 中系统键盘遮挡底部弹窗、底部输入区和编辑窗口的问题：
+
+- Android Activity 新增 `windowSoftInputMode="stateHidden|adjustResize"`，让系统键盘弹出时优先按可见区域调整 WebView。
+- Web 层根据 `window.visualViewport` 计算 `--keyboard-inset`，键盘打开时同步更新 `--app-height` 并给 `body` 加 `keyboard-open`。
+- 移动端底部弹窗、锁屏输入层和主要长弹窗会在 `keyboard-open` 时扣除键盘高度，避免输入框和底部操作按钮被遮挡。
+- 输入控件聚焦后会在键盘动画过程中多次 `scrollIntoView()`，让当前编辑的 `input` / `textarea` / `select` 回到可见区域。
+- 更新本地 app shell 缓存版本和 `styles.css` / `js/app.js` 查询版本，避免 Android WebView / PWA 灰度时先吃到旧缓存。
+- 已重新生成 Android test APK 到 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，APK 不提交进 git。
+
+本轮没有修改主 data schema、localStorage key、IndexedDB schema、主 JSON / encrypted-json 内容语义、账本 JSON / CSV 语义、账本隔离、图片 hydrate / externalize、伪装账本入口逻辑或 `messageIntegrity`，也没有新增 npm、CDN、`type="module"`、云同步或远程 API。长弹窗滚动修复、Android Downloads 导出保存修复、后台回首页 / 锁定修复和文件选择器豁免保持不变。
+
 ## P7-05 Android 文件选择器后台回首页豁免
 
 P7-05 修复 Android APK 中系统文件选择器误触发“退出或切到后台后回到首页”的问题：

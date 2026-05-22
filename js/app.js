@@ -1,6 +1,60 @@
     /* ── Tauri 桌面端桥接：让现有 MoonBridge 接口在 Tauri 下生效 ── */
     (function setupTauriBridge(){if(!window.__TAURI_INTERNALS__)return; const invoke=window.__TAURI_INTERNALS__.invoke; if(typeof invoke!=="function")return; window.MoonBridge=window.MoonBridge||{}; window.MoonBridge.authenticate=function(){invoke("moon_authenticate").then(()=>{window.onMoonAuthResult&&window.onMoonAuthResult(true,"");}).catch(err=>{const msg=String(err?.message||err||""); const display=/cancel|user.*cancel|取消/i.test(msg)?"已取消":("验证失败："+(msg||"未知错误")); window.onMoonAuthResult&&window.onMoonAuthResult(false,display);});};})();
-    (function setupViewportHeight(){const sync=()=>{document.body.style.setProperty("--app-height",`${window.innerHeight}px`);}; sync(); window.addEventListener("resize",sync,{passive:true}); window.addEventListener("orientationchange",()=>setTimeout(sync,240),{passive:true}); if(window.visualViewport)window.visualViewport.addEventListener("resize",sync,{passive:true});})();
+    (function setupViewportHeight(){
+      const root=document.documentElement;
+      const keyboardControls="input, textarea, select, [contenteditable='true']";
+      function hasKeyboardFocus(){
+        const active=document.activeElement;
+        return active instanceof HTMLElement&&active.matches(keyboardControls);
+      }
+      function sync(){
+        const visual=window.visualViewport;
+        let appHeight=window.innerHeight;
+        let keyboardInset=0;
+        if(visual){
+          const rawInset=Math.max(0,Math.round(window.innerHeight-visual.height-(visual.offsetTop||0)));
+          keyboardInset=rawInset>40&&hasKeyboardFocus()?rawInset:0;
+          if(keyboardInset>40)appHeight=Math.max(320,Math.round(visual.height+(visual.offsetTop||0)));
+        }
+        root.style.setProperty("--keyboard-inset",`${keyboardInset}px`);
+        document.body.style.setProperty("--app-height",`${Math.round(appHeight)}px`);
+        document.body.classList.toggle("keyboard-open",keyboardInset>40);
+      }
+      function syncSoon(){sync(); setTimeout(sync,120); setTimeout(sync,320);}
+      sync();
+      window.addEventListener("resize",syncSoon,{passive:true});
+      window.addEventListener("orientationchange",()=>setTimeout(syncSoon,240),{passive:true});
+      document.addEventListener("focusin",syncSoon,true);
+      document.addEventListener("focusout",()=>setTimeout(syncSoon,120),true);
+      if(window.visualViewport){
+        window.visualViewport.addEventListener("resize",syncSoon,{passive:true});
+        window.visualViewport.addEventListener("scroll",syncSoon,{passive:true});
+      }
+    })();
+    (function setupKeyboardFocusScroll(){
+      const inputSelector="input, textarea, select, [contenteditable='true']";
+      const ignoredInputTypes=new Set(["button","checkbox","color","file","hidden","image","radio","range","reset","submit"]);
+      function shouldAssistFocus(target){
+        if(!(target instanceof HTMLElement)||!target.matches(inputSelector))return false;
+        if(target.tagName==="INPUT"&&ignoredInputTypes.has(String(target.type||"").toLowerCase()))return false;
+        const mobile=window.matchMedia&&window.matchMedia("(max-width: 760px)").matches;
+        const android=!!(window.MoonAndroidDownloads||window.MoonAndroidBiometric||window.__MOON_ANDROID_WRAPPER__);
+        if(!mobile&&!android&&!document.body.classList.contains("keyboard-open"))return false;
+        return !!target.closest(".composer,.modal,.modal-backdrop,.lock-backdrop,.disclaimer-backdrop,.cover-main,main");
+      }
+      function scrollFocusedField(target,behavior="smooth"){
+        if(!target||!document.contains(target))return;
+        try{target.scrollIntoView({block:"center",inline:"nearest",behavior});}
+        catch{try{target.scrollIntoView(false);}catch{}}
+      }
+      document.addEventListener("focusin",event=>{
+        const target=event.target;
+        if(!shouldAssistFocus(target))return;
+        setTimeout(()=>scrollFocusedField(target,"smooth"),160);
+        setTimeout(()=>scrollFocusedField(target,"smooth"),360);
+        if(window.visualViewport)setTimeout(()=>scrollFocusedField(target,"smooth"),620);
+      },true);
+    })();
     let data; let prefs; let ledgerRecords=[]; let ledgerSettings={categories:[],budgets:[],defaultViewMode:"month"}; let editingLedgerId=null; let editingLedgerCategoryId=null; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover"; let journalAccessLocked=true; let pendingJournalEntryReason="";
     const list=document.getElementById("list"), messages=document.getElementById("messages"), roomName=document.getElementById("roomName"), roomDesc=document.getElementById("roomDesc"), speaker=document.getElementById("speaker"), kind=document.getElementById("kind"), search=document.getElementById("search"), fontSize=document.getElementById("fontSize"), fontSizeValue=document.getElementById("fontSizeValue"), themeBtn=document.getElementById("themeBtn"), contextMenu=document.getElementById("contextMenu"), imageInput=document.getElementById("imageInput"), importInput=document.getElementById("importInput"), memberAvatarInput=document.getElementById("memberAvatarInput"), roomBgInput=document.getElementById("roomBgInput"), drawerBtn=document.getElementById("drawerBtn"), drawerBackdrop=document.getElementById("drawerBackdrop");
     function showMenu(e,items){e.preventDefault(); e.stopPropagation(); contextMenu.innerHTML=items.map((item,i)=>`<button class="${item.danger?"danger-action":""}" data-i="${i}">${esc(item.label)}</button>`).join(""); contextMenu.style.display="block"; const rect=contextMenu.getBoundingClientRect(); contextMenu.style.left=Math.min(e.clientX,window.innerWidth-rect.width-8)+"px"; contextMenu.style.top=Math.min(e.clientY,window.innerHeight-rect.height-8)+"px"; contextMenu.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{const item=items[Number(btn.dataset.i)]; closeMenu(); item.action();});}

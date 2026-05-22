@@ -1,3 +1,4 @@
+    :root { --keyboard-inset:0px; }
     * { box-sizing: border-box; }
     html { height:100%; background:#f4f5f7; }
     body { --message-font-size:14px; --app-height:100dvh; margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; background:#f4f5f7; color:#1f2937; height:var(--app-height); min-height:var(--app-height); overflow:hidden; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
@@ -780,6 +781,42 @@
       .annotate-toolbar { grid-template-columns:repeat(3,1fr) 48px; }
       .annotate-toolbar input[type="text"], .annotate-size { grid-column:1 / -1; }
       .annotate-toolbar button { padding:8px 6px; }
+    }
+    body.keyboard-open .modal-backdrop,
+    body.keyboard-open .disclaimer-backdrop,
+    body.keyboard-open .lock-backdrop {
+      align-items:flex-end;
+      padding-bottom:calc(12px + env(safe-area-inset-bottom) + var(--keyboard-inset,0px));
+    }
+    body.keyboard-open .modal,
+    body.keyboard-open .disclaimer {
+      max-height:calc(100vh - 32px - var(--keyboard-inset,0px));
+      max-height:calc(100dvh - 32px - var(--keyboard-inset,0px));
+    }
+    body.keyboard-open .advanced-search-modal,
+    body.keyboard-open .timeline-modal,
+    body.keyboard-open .poll-modal,
+    body.keyboard-open .handoff-modal,
+    body.keyboard-open .care-modal,
+    body.keyboard-open .backup-health-modal,
+    body.keyboard-open .storage-health-modal,
+    body.keyboard-open .fronting-modal,
+    body.keyboard-open .arrival-modal {
+      max-height:min(calc(100vh - 32px - var(--keyboard-inset,0px)),860px);
+      max-height:min(calc(100dvh - 32px - var(--keyboard-inset,0px)),860px);
+    }
+    body.keyboard-open .messages,
+    body.keyboard-open .cover-main,
+    body.keyboard-open .modal,
+    body.keyboard-open .modal-scroll-body {
+      scroll-padding-bottom:calc(24px + var(--keyboard-inset,0px));
+    }
+    body.keyboard-open input,
+    body.keyboard-open textarea,
+    body.keyboard-open select,
+    body.keyboard-open .modal-actions,
+    body.keyboard-open .ledger-form-actions {
+      scroll-margin-bottom:calc(24px + var(--keyboard-inset,0px));
     }
     /* ─────── UI 优化追加：仅视觉与交互手感，不改动功能 ─────── */
     /* 平滑过渡：让按钮、列表项、气泡、输入框的状态变化更柔和 */
