@@ -1,5 +1,18 @@
 # 发布说明
 
+## P7-06 Android 长窗口键盘 Reserve 修复
+
+P7-06 继续修复 Android APK 中键盘遮挡长窗口底部输入框的问题：
+
+- Web 层新增 `--keyboard-reserve`，在 `--keyboard-inset` 基础上追加缓冲空间。
+- 长弹窗内部滚动区、普通可滚动 modal 和账本首页滚动区在键盘打开时获得真实底部 reserve padding，避免内容已经到底时仍无法把输入框滚到键盘上方。
+- 聚焦输入框后会优先滚动最近的实际滚动容器，而不是只调用元素自身 `scrollIntoView()`。
+- 键盘动画期间新增立即、150ms、300ms、600ms、900ms 多次校正，覆盖 Android WebView `visualViewport` 更新延迟。
+- 本地 app shell 缓存版本和 `styles.css` / `js/app.js` 查询版本已更新，避免灰度 APK / PWA 继续读旧键盘适配资源。
+- 已重新生成 Android test APK 到 `/Users/pareo/Documents/月之暗面-v0.4.1-android-test.apk`，APK 不提交进 git。
+
+本轮没有修改主 data schema、localStorage key、IndexedDB schema、主 JSON / encrypted-json 内容语义、账本 JSON / CSV 语义、账本隔离、图片 hydrate / externalize、伪装账本入口逻辑或 `messageIntegrity`，也没有新增 npm、CDN、`type="module"`、云同步或远程 API。Android Downloads、后台回首页 / 锁定和文件选择器豁免修复保持不变。
+
 ## P7-06 Android 键盘遮挡底部窗口修复
 
 P7-06 修复 Android APK 中系统键盘遮挡底部弹窗、底部输入区和编辑窗口的问题：

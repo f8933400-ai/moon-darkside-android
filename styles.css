@@ -1,4 +1,4 @@
-    :root { --keyboard-inset:0px; }
+    :root { --keyboard-inset:0px; --keyboard-reserve:0px; }
     * { box-sizing: border-box; }
     html { height:100%; background:#f4f5f7; }
     body { --message-font-size:14px; --app-height:100dvh; margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; background:#f4f5f7; color:#1f2937; height:var(--app-height); min-height:var(--app-height); overflow:hidden; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
@@ -809,14 +809,26 @@
     body.keyboard-open .cover-main,
     body.keyboard-open .modal,
     body.keyboard-open .modal-scroll-body {
-      scroll-padding-bottom:calc(24px + var(--keyboard-inset,0px));
+      scroll-padding-bottom:calc(72px + var(--keyboard-reserve,0px));
+    }
+    body.keyboard-open .modal:not(.advanced-search-modal):not(.timeline-modal),
+    body.keyboard-open .disclaimer {
+      padding-bottom:calc(18px + env(safe-area-inset-bottom) + var(--keyboard-reserve,0px));
+    }
+    body.keyboard-open .modal-scroll-body,
+    body.keyboard-open .advanced-search-scroll-body,
+    body.keyboard-open .timeline-scroll-body {
+      padding-bottom:calc(18px + env(safe-area-inset-bottom) + var(--keyboard-reserve,0px));
+    }
+    body.keyboard-open .cover-main {
+      padding-bottom:calc(16px + var(--keyboard-reserve,0px));
     }
     body.keyboard-open input,
     body.keyboard-open textarea,
     body.keyboard-open select,
     body.keyboard-open .modal-actions,
     body.keyboard-open .ledger-form-actions {
-      scroll-margin-bottom:calc(24px + var(--keyboard-inset,0px));
+      scroll-margin-bottom:calc(72px + var(--keyboard-reserve,0px));
     }
     /* ─────── UI 优化追加：仅视觉与交互手感，不改动功能 ─────── */
     /* 平滑过渡：让按钮、列表项、气泡、输入框的状态变化更柔和 */

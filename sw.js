@@ -1,4 +1,4 @@
-const CACHE_NAME = "moon-app-shell-v0.4.1-p7-06-keyboard-inset";
+const CACHE_NAME = "moon-app-shell-v0.4.1-p7-06-keyboard-reserve";
 
 const APP_SHELL = [
   "./",

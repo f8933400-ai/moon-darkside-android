@@ -11,12 +11,15 @@
         const visual=window.visualViewport;
         let appHeight=window.innerHeight;
         let keyboardInset=0;
+        let keyboardReserve=0;
         if(visual){
           const rawInset=Math.max(0,Math.round(window.innerHeight-visual.height-(visual.offsetTop||0)));
           keyboardInset=rawInset>40&&hasKeyboardFocus()?rawInset:0;
+          keyboardReserve=keyboardInset>40?keyboardInset+32:0;
           if(keyboardInset>40)appHeight=Math.max(320,Math.round(visual.height+(visual.offsetTop||0)));
         }
         root.style.setProperty("--keyboard-inset",`${keyboardInset}px`);
+        root.style.setProperty("--keyboard-reserve",`${keyboardReserve}px`);
         document.body.style.setProperty("--app-height",`${Math.round(appHeight)}px`);
         document.body.classList.toggle("keyboard-open",keyboardInset>40);
       }
@@ -44,15 +47,61 @@
       }
       function scrollFocusedField(target,behavior="smooth"){
         if(!target||!document.contains(target))return;
-        try{target.scrollIntoView({block:"center",inline:"nearest",behavior});}
-        catch{try{target.scrollIntoView(false);}catch{}}
+        const scroller=findKeyboardScrollContainer(target);
+        const delta=keyboardScrollDelta(target,scroller);
+        if(Math.abs(delta)>2){
+          try{
+            if(scroller===document.scrollingElement)window.scrollBy({top:delta,behavior});
+            else scroller.scrollTo({top:scroller.scrollTop+delta,behavior});
+          }catch{
+            if(scroller===document.scrollingElement)window.scrollBy(0,delta);
+            else scroller.scrollTop+=delta;
+          }
+        }
+        setTimeout(()=>{
+          if(Math.abs(keyboardScrollDelta(target,scroller))>2){
+            try{target.scrollIntoView({block:"center",inline:"nearest",behavior});}
+            catch{try{target.scrollIntoView(false);}catch{}}
+          }
+        },40);
+      }
+      function findKeyboardScrollContainer(target){
+        const preferred=target.closest(".modal-scroll-body,.modal,.cover-main,.messages,.list");
+        if(preferred&&preferred.scrollHeight>preferred.clientHeight+1)return preferred;
+        let node=target.parentElement;
+        while(node&&node!==document.body){
+          const style=getComputedStyle(node);
+          if(/auto|scroll|overlay/.test(style.overflowY)&&node.scrollHeight>node.clientHeight+1)return node;
+          node=node.parentElement;
+        }
+        return document.scrollingElement||document.documentElement;
+      }
+      function keyboardScrollDelta(target,scroller){
+        const visual=window.visualViewport;
+        const viewportTop=visual?visual.offsetTop:0;
+        const viewportBottom=viewportTop+(visual?visual.height:window.innerHeight);
+        const bottomMargin=32;
+        const topMargin=16;
+        let visibleTop=viewportTop+topMargin;
+        let visibleBottom=viewportBottom-bottomMargin;
+        if(scroller&&scroller!==document.scrollingElement){
+          const bounds=scroller.getBoundingClientRect();
+          visibleTop=Math.max(visibleTop,bounds.top+topMargin);
+          visibleBottom=Math.min(visibleBottom,bounds.bottom-bottomMargin);
+        }
+        const rect=target.getBoundingClientRect();
+        if(rect.bottom>visibleBottom)return rect.bottom-visibleBottom;
+        if(rect.top<visibleTop)return rect.top-visibleTop;
+        return 0;
       }
       document.addEventListener("focusin",event=>{
         const target=event.target;
         if(!shouldAssistFocus(target))return;
-        setTimeout(()=>scrollFocusedField(target,"smooth"),160);
-        setTimeout(()=>scrollFocusedField(target,"smooth"),360);
-        if(window.visualViewport)setTimeout(()=>scrollFocusedField(target,"smooth"),620);
+        scrollFocusedField(target,"auto");
+        setTimeout(()=>scrollFocusedField(target,"smooth"),150);
+        setTimeout(()=>scrollFocusedField(target,"smooth"),300);
+        setTimeout(()=>scrollFocusedField(target,"smooth"),600);
+        if(window.visualViewport)setTimeout(()=>scrollFocusedField(target,"smooth"),900);
       },true);
     })();
     let data; let prefs; let ledgerRecords=[]; let ledgerSettings={categories:[],budgets:[],defaultViewMode:"month"}; let editingLedgerId=null; let editingLedgerCategoryId=null; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover"; let journalAccessLocked=true; let pendingJournalEntryReason="";
