@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="月之暗面" />
   <script src="js/sw-register.js"></script>
-  <link rel="stylesheet" href="styles.css?p103=1&p304=1&p701=1&p702=1&p706=2">
+  <link rel="stylesheet" href="styles.css?p103=1&p304=1&p701=1&p702=1&p706=2&p707=2">
 </head>
 <body>
   <div class="cover-app" id="coverApp">
@@ -175,7 +175,7 @@
       <div class="section"><div class="row"><button class="light" id="addMemberBtn">成员</button><button class="light" id="addRoomBtn">群组</button><button class="light" id="addPrivateBtn">私聊</button></div><div class="row" style="margin-top:8px"><button class="light" id="systemBtn" type="button">系统</button><button class="light" id="timelineBtn" type="button">时间线</button><button class="light" id="settingsBtn" type="button">设置</button></div></div>
     </aside>
     <main>
-      <div class="chat-head"><div class="chat-title-row"><button class="light menu-btn" id="drawerBtn" type="button">☰</button><div class="chat-title"><strong id="roomName">内部大厅</strong><span id="roomDesc">系统成员之间的日常沟通记录</span></div></div><div class="chat-tools"><button class="light" id="roomBgQuickBtn" type="button">背景</button><button class="light" id="dailyBtn" type="button">今日状态</button><button class="light" id="careBtn" type="button">照护</button><button class="light" id="pollBtn" type="button">投票</button><button class="light" id="frontingBtn" type="button">前台</button><button class="light btn ghost" id="arrivalBtn" type="button">接续</button><button class="light" id="handoffBtn" type="button">交接</button></div></div>
+      <div class="chat-head"><div class="chat-title-row"><button class="light menu-btn" id="drawerBtn" type="button">☰</button><div class="chat-title"><strong id="roomName">内部大厅</strong><span id="roomDesc">系统成员之间的日常沟通记录</span></div></div><div class="chat-tools-wrap" id="chatToolsWrap"><button class="light chat-tools-toggle" id="chatToolsToggle" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="chatToolsPanel">工具</button><div class="chat-tools-panel" id="chatToolsPanel" aria-label="对话工具"><div class="chat-tools-panel-head"><strong>对话工具</strong><span>记录、协作和整理</span></div><div class="chat-tools"><button class="light" id="roomBgQuickBtn" type="button">背景</button><button class="light" id="dailyBtn" type="button">今日状态</button><button class="light" id="careBtn" type="button">照护</button><button class="light" id="pollBtn" type="button">投票</button><button class="light" id="frontingBtn" type="button">前台</button><button class="light btn ghost" id="arrivalBtn" type="button">接续</button><button class="light" id="handoffBtn" type="button">交接</button><button class="light" id="longScreenshotBtn" type="button">长截图</button></div></div></div></div>
       <div class="messages" id="messages"></div>
       <form class="composer" id="messageForm"><div class="compose-tools"><select id="speaker"></select><select id="kind"></select><button class="light kind-manage-btn" id="kindManageBtn" type="button">分类</button></div><textarea id="message" placeholder="写下想说的话。Enter 发送，Shift + Enter 换行。"></textarea><input class="image-input" id="imageInput" type="file" accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.heic,.heif" /><div class="send-row"><div class="send-left"><span class="hint">数据保存在本应用内。</span><div class="attach-tools"><button class="light small" id="imageBtn" type="button">图片</button></div></div><button type="submit">发送</button></div></form>
     </main>
@@ -235,6 +235,6 @@
   <script src="js/features/arrival.js?p0arrival=1&p103=1"></script>
   <script src="js/features/search.js?p0search=1&p702=1"></script>
   <script src="js/features/timeline.js?p211=1"></script>
-  <script src="js/app.js?p0members=2&p1privacy=1&p103=1&p304=1&p701=1&p702=1&p706=2"></script>
+  <script src="js/app.js?p0members=2&p1privacy=1&p103=1&p304=1&p701=1&p702=1&p706=2&p707=2"></script>
 </body>
 </html>

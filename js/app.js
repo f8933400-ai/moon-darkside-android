@@ -105,13 +105,223 @@
       },true);
     })();
     let data; let prefs; let ledgerRecords=[]; let ledgerSettings={categories:[],budgets:[],defaultViewMode:"month"}; let editingLedgerId=null; let editingLedgerCategoryId=null; let currentRoomId="main"; let tab="rooms"; let pendingMemberAvatar=null; let pendingRoomBg=null; let pendingChatImage=null; let pendingSystemCardPayload=null; let pendingSystemCardImage=null; let pendingSystemCardBg=null; let pendingReceivedSystemCard=null; let longPressTimer=null; let appMode="cover"; let journalAccessLocked=true; let pendingJournalEntryReason="";
-    const list=document.getElementById("list"), messages=document.getElementById("messages"), roomName=document.getElementById("roomName"), roomDesc=document.getElementById("roomDesc"), speaker=document.getElementById("speaker"), kind=document.getElementById("kind"), search=document.getElementById("search"), fontSize=document.getElementById("fontSize"), fontSizeValue=document.getElementById("fontSizeValue"), themeBtn=document.getElementById("themeBtn"), contextMenu=document.getElementById("contextMenu"), imageInput=document.getElementById("imageInput"), importInput=document.getElementById("importInput"), memberAvatarInput=document.getElementById("memberAvatarInput"), roomBgInput=document.getElementById("roomBgInput"), drawerBtn=document.getElementById("drawerBtn"), drawerBackdrop=document.getElementById("drawerBackdrop");
+    const list=document.getElementById("list"), messages=document.getElementById("messages"), roomName=document.getElementById("roomName"), roomDesc=document.getElementById("roomDesc"), speaker=document.getElementById("speaker"), kind=document.getElementById("kind"), search=document.getElementById("search"), fontSize=document.getElementById("fontSize"), fontSizeValue=document.getElementById("fontSizeValue"), themeBtn=document.getElementById("themeBtn"), contextMenu=document.getElementById("contextMenu"), imageInput=document.getElementById("imageInput"), importInput=document.getElementById("importInput"), memberAvatarInput=document.getElementById("memberAvatarInput"), roomBgInput=document.getElementById("roomBgInput"), drawerBtn=document.getElementById("drawerBtn"), drawerBackdrop=document.getElementById("drawerBackdrop"), chatToolsWrap=document.getElementById("chatToolsWrap"), chatToolsToggle=document.getElementById("chatToolsToggle"), chatToolsPanel=document.getElementById("chatToolsPanel");
     function showMenu(e,items){e.preventDefault(); e.stopPropagation(); contextMenu.innerHTML=items.map((item,i)=>`<button class="${item.danger?"danger-action":""}" data-i="${i}">${esc(item.label)}</button>`).join(""); contextMenu.style.display="block"; const rect=contextMenu.getBoundingClientRect(); contextMenu.style.left=Math.min(e.clientX,window.innerWidth-rect.width-8)+"px"; contextMenu.style.top=Math.min(e.clientY,window.innerHeight-rect.height-8)+"px"; contextMenu.querySelectorAll("button").forEach(btn=>btn.onclick=()=>{const item=items[Number(btn.dataset.i)]; closeMenu(); item.action();});}
     function closeMenu(){contextMenu.style.display="none"; contextMenu.innerHTML="";}
     function startLongPress(e,type,id){if(e.pointerType==="mouse")return; cancelLongPress(); const x=e.clientX,y=e.clientY; longPressTimer=setTimeout(()=>{const fake={preventDefault(){},stopPropagation(){},clientX:x,clientY:y}; if(type==="room"||type==="private")showRoomMenu(fake,id); if(type==="member")showMemberMenu(fake,id); if(type==="message")showMessageMenu(fake,id);},560);}
     function cancelLongPress(){if(longPressTimer){clearTimeout(longPressTimer); longPressTimer=null;}}
     function openDrawer(){document.body.classList.add("drawer-open");}
     function closeDrawer(){document.body.classList.remove("drawer-open");}
+    function closeChatTools(){if(!chatToolsPanel||!chatToolsToggle)return; chatToolsPanel.classList.remove("open"); chatToolsToggle.setAttribute("aria-expanded","false");}
+    function openChatTools(){if(!chatToolsPanel||!chatToolsToggle)return; chatToolsPanel.classList.add("open"); chatToolsToggle.setAttribute("aria-expanded","true");}
+    function toggleChatTools(){if(chatToolsPanel?.classList.contains("open"))closeChatTools(); else openChatTools();}
+    function longShotSafeFilename(value){return String(value||"moon").trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g,"-").replace(/\s+/g," ").slice(0,48)||"moon";}
+    function longShotDateText(value){const d=new Date(value||Date.now()); return Number.isNaN(d.getTime())?"时间未知":d.toLocaleString();}
+    function loadLongShotImage(src){return new Promise((resolve,reject)=>{if(!src){resolve(null);return;} const img=new Image(); img.onload=()=>resolve(img); img.onerror=reject; img.src=src;});}
+    function wrapLongShotText(ctx,text,maxWidth){
+      const out=[];
+      String(text||"").split(/\n/).forEach(part=>{
+        if(!part){out.push(""); return;}
+        let line="";
+        for(const ch of part){
+          const next=line+ch;
+          if(ctx.measureText(next).width>maxWidth&&line){out.push(line); line=ch;}
+          else line=next;
+        }
+        out.push(line);
+      });
+      return out;
+    }
+    function roundRectPath(ctx,x,y,w,h,r){
+      const radius=Math.min(r,w/2,h/2);
+      ctx.beginPath();
+      ctx.moveTo(x+radius,y);
+      ctx.arcTo(x+w,y,x+w,y+h,radius);
+      ctx.arcTo(x+w,y+h,x,y+h,radius);
+      ctx.arcTo(x,y+h,x,y,radius);
+      ctx.arcTo(x,y,x+w,y,radius);
+      ctx.closePath();
+    }
+    function fillRoundRect(ctx,x,y,w,h,r,fill){
+      roundRectPath(ctx,x,y,w,h,r);
+      ctx.fillStyle=fill;
+      ctx.fill();
+    }
+    function drawLongShotImage(ctx,img,x,y,w,h,r){
+      ctx.save();
+      roundRectPath(ctx,x,y,w,h,r);
+      ctx.clip();
+      ctx.drawImage(img,x,y,w,h);
+      ctx.restore();
+    }
+    function drawLongShotAvatar(ctx,x,y,size,name,img,color="#d1d5db"){
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x+size/2,y+size/2,size/2,0,Math.PI*2);
+      ctx.clip();
+      if(img)ctx.drawImage(img,x,y,size,size);
+      else {
+        ctx.fillStyle=color;
+        ctx.fillRect(x,y,size,size);
+        ctx.fillStyle="#374151";
+        ctx.font="700 24px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+        ctx.textAlign="center";
+        ctx.textBaseline="middle";
+        ctx.fillText(first(name||"?"),x+size/2,y+size/2+1);
+      }
+      ctx.restore();
+      ctx.textAlign="left";
+      ctx.textBaseline="alphabetic";
+    }
+    function measureLongShotEntry(ctx,row,prev,assets){
+      const cfg={pad:48,avatar:54,gap:14,bubblePadX:24,bubblePadY:18,bubbleMax:690,lineH:34,imgMaxW:560,imgMaxH:420};
+      const person=member(row.speakerId);
+      const isSystem=row.speakerId==="system";
+      const showTime=!prev||new Date(row.createdAt)-new Date(prev.createdAt)>600000;
+      ctx.font="28px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+      const text=String(row.text||"").trim();
+      const lines=text?wrapLongShotText(ctx,text,cfg.bubbleMax-cfg.bubblePadX*2):[];
+      const image=assets.images.get(row.id)||null;
+      let imageBox=null;
+      if(image){
+        const scale=Math.min(1,cfg.imgMaxW/image.width,cfg.imgMaxH/image.height);
+        imageBox={w:Math.max(1,Math.round(image.width*scale)),h:Math.max(1,Math.round(image.height*scale))};
+      }
+      const lineWidth=lines.reduce((max,line)=>Math.max(max,ctx.measureText(line||" ").width),0);
+      const contentWidth=Math.max(lineWidth,imageBox?.w||0,text||image?160:180);
+      const bubbleW=Math.min(cfg.bubbleMax,Math.ceil(contentWidth+cfg.bubblePadX*2));
+      const bubbleH=cfg.bubblePadY*2+(lines.length?lines.length*cfg.lineH:0)+(lines.length&&imageBox?14:0)+(imageBox?imageBox.h:0)+(text||image?0:cfg.lineH);
+      const whoH=isSystem?0:28;
+      const timeH=showTime?42:0;
+      const bottomGap=22;
+      return {row,person,isSystem,showTime,lines,imageBox,bubbleW,bubbleH,whoH,timeH,bottomGap,height:timeH+whoH+bubbleH+bottomGap};
+    }
+    function drawLongShotEntry(ctx,entry,y,assets,activeSpeakerId){
+      const cfg={width:1080,pad:48,avatar:54,gap:14,bubblePadX:24,bubblePadY:18,lineH:34};
+      const row=entry.row, person=entry.person, isMine=!entry.isSystem&&row.speakerId===activeSpeakerId;
+      if(entry.showTime){
+        ctx.font="24px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+        ctx.fillStyle="#9ca3af";
+        ctx.textAlign="center";
+        ctx.fillText(longShotDateText(row.createdAt),cfg.width/2,y+26);
+        ctx.textAlign="left";
+        y+=entry.timeH;
+      }
+      if(entry.isSystem){
+        const x=(cfg.width-entry.bubbleW)/2;
+        fillRoundRect(ctx,x,y,entry.bubbleW,entry.bubbleH,24,"#f3f4f6");
+        drawLongShotEntryContent(ctx,entry,x+cfg.bubblePadX,y+cfg.bubblePadY,assets,"#4b5563");
+        return y+entry.bubbleH+entry.bottomGap;
+      }
+      const name=memberNameByMessage(row);
+      const tagColor=tag(person?.tagId)?.color||"#d1d5db";
+      const avatarX=isMine?cfg.width-cfg.pad-cfg.avatar:cfg.pad;
+      const bubbleX=isMine?avatarX-cfg.gap-entry.bubbleW:cfg.pad+cfg.avatar+cfg.gap;
+      const whoX=bubbleX+4;
+      ctx.font="23px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+      ctx.fillStyle="#6b7280";
+      ctx.textAlign=isMine?"right":"left";
+      ctx.fillText(`${name} · ${row.kind||"普通"}`,isMine?bubbleX+entry.bubbleW-4:whoX,y+21);
+      ctx.textAlign="left";
+      y+=entry.whoH;
+      drawLongShotAvatar(ctx,avatarX,y,cfg.avatar,name,assets.avatars.get(row.id)||null,tagColor);
+      fillRoundRect(ctx,bubbleX,y,entry.bubbleW,entry.bubbleH,22,isMine?"#e8f5e9":"#ffffff");
+      ctx.strokeStyle="#eef0f3";
+      ctx.lineWidth=2;
+      roundRectPath(ctx,bubbleX,y,entry.bubbleW,entry.bubbleH,22);
+      ctx.stroke();
+      drawLongShotEntryContent(ctx,entry,bubbleX+cfg.bubblePadX,y+cfg.bubblePadY,assets,"#1f2937");
+      return y+entry.bubbleH+entry.bottomGap;
+    }
+    function drawLongShotEntryContent(ctx,entry,x,y,assets,color){
+      const image=assets.images.get(entry.row.id)||null;
+      ctx.font="28px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+      ctx.fillStyle=color;
+      entry.lines.forEach(line=>{ctx.fillText(line||" ",x,y+24); y+=34;});
+      if(!entry.lines.length&&!image){
+        ctx.fillStyle="#9ca3af";
+        ctx.fillText("（空白消息）",x,y+24);
+        y+=34;
+      }
+      if(entry.lines.length&&image)y+=14;
+      if(image&&entry.imageBox)drawLongShotImage(ctx,image,x,y,entry.imageBox.w,entry.imageBox.h,16);
+    }
+    async function collectLongShotAssets(rows){
+      const assets={images:new Map(),avatars:new Map()};
+      await Promise.all(rows.map(async row=>{
+        try{
+          const src=await resolveStoredImageUrl(row,"imageId","imageData");
+          if(src){const img=await loadLongShotImage(src).catch(()=>null); if(img)assets.images.set(row.id,img);}
+        }catch(err){console.warn("long screenshot image skipped",err);}
+        try{
+          const person=member(row.speakerId);
+          const avatarSrc=person?await resolveStoredImageUrl(person,"avatarId","avatarData"):"";
+          if(avatarSrc){const img=await loadLongShotImage(avatarSrc).catch(()=>null); if(img)assets.avatars.set(row.id,img);}
+        }catch(err){console.warn("long screenshot avatar skipped",err);}
+      }));
+      return assets;
+    }
+    async function buildCurrentRoomLongScreenshot(){
+      const r=room();
+      const rows=getRoomMessages(currentRoomId);
+      if(!r||!rows.length){alert("当前对话还没有可生成长截图的内容。"); return null;}
+      const width=1080, pad=48, headerH=172, footerH=76, maxHeight=30000;
+      const canvas=document.createElement("canvas");
+      canvas.width=width;
+      const ctx=canvas.getContext("2d");
+      const assets=await collectLongShotAssets(rows);
+      const entries=rows.map((row,i)=>measureLongShotEntry(ctx,row,rows[i-1],assets));
+      const height=Math.ceil(headerH+entries.reduce((sum,item)=>sum+item.height,0)+footerH);
+      if(height>maxHeight){
+        alert(`当前对话生成的长图过高（约 ${height}px）。请先按时间或对话拆分后再生成长截图。`);
+        return null;
+      }
+      canvas.height=height;
+      ctx.fillStyle="#f7f8fa";
+      ctx.fillRect(0,0,width,height);
+      ctx.fillStyle="#111827";
+      ctx.font="700 42px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+      ctx.fillText(roomDisplayName(r),pad,70);
+      ctx.font="25px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+      ctx.fillStyle="#6b7280";
+      const desc=roomDisplayDesc(r)||"当前对话";
+      wrapLongShotText(ctx,desc,width-pad*2).slice(0,2).forEach((line,i)=>ctx.fillText(line,pad,112+i*32));
+      ctx.fillStyle="#9ca3af";
+      ctx.font="22px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+      ctx.fillText(`由《月之暗面》生成 · ${rows.length} 条记录 · ${new Date().toLocaleString()}`,pad,headerH-18);
+      let y=headerH;
+      const activeSpeakerId=speaker.value||data.members[0]?.id||"";
+      entries.forEach(entry=>{y=drawLongShotEntry(ctx,entry,y,assets,activeSpeakerId);});
+      ctx.fillStyle="#9ca3af";
+      ctx.font="22px system-ui,-apple-system,BlinkMacSystemFont,sans-serif";
+      ctx.textAlign="center";
+      ctx.fillText("长截图仅用于阅读分享；完整备份请继续导出 JSON。",width/2,height-34);
+      ctx.textAlign="left";
+      return canvas.toDataURL("image/png");
+    }
+    async function saveCurrentRoomLongScreenshot(){
+      const btn=document.getElementById("longScreenshotBtn");
+      const oldText=btn?.textContent||"长截图";
+      if(btn){btn.disabled=true; btn.textContent="生成中";}
+      try{
+        const dataUrl=await buildCurrentRoomLongScreenshot();
+        if(!dataUrl)return;
+        const r=room();
+        const filename=`月之暗面-长截图-${longShotSafeFilename(roomDisplayName(r))}-${new Date().toISOString().slice(0,10)}.png`;
+        if(window.downloadDataUrlFile)await window.downloadDataUrlFile(filename,"image/png",dataUrl);
+        else {
+          const a=document.createElement("a");
+          a.href=dataUrl;
+          a.download=filename;
+          a.click();
+        }
+      }catch(err){
+        console.error("long screenshot failed",err);
+        alert("长截图生成失败，请稍后重试。");
+      }finally{
+        if(btn){btn.disabled=false; btn.textContent=oldText;}
+      }
+    }
     function cloneAppStateForRollback(){return {data:JSON.parse(JSON.stringify(data)),prefs:JSON.parse(JSON.stringify(prefs||{})),currentRoomId,tab};}
     function restoreAppStateFromRollback(snapshot){if(!snapshot)return; data=JSON.parse(JSON.stringify(snapshot.data)); if(snapshot.prefs)prefs=JSON.parse(JSON.stringify(snapshot.prefs)); currentRoomId=snapshot.currentRoomId||data.rooms?.[0]?.id||"main"; if(snapshot.tab)tab=snapshot.tab;}
     function makeStoredImageId(prefix){return `${prefix}-${makeId()}`;}
@@ -280,6 +490,13 @@
     };
     document.addEventListener("click",closeMenu); document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu();}); window.addEventListener("resize",closeMenu);
     drawerBtn.onclick=openDrawer; drawerBackdrop.onclick=closeDrawer; document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDrawer();});
+    if(chatToolsToggle&&chatToolsPanel){
+      chatToolsToggle.onclick=e=>{e.stopPropagation(); toggleChatTools();};
+      chatToolsPanel.addEventListener("click",e=>{if(e.target.closest("button"))closeChatTools(); e.stopPropagation();});
+      document.addEventListener("click",e=>{if(chatToolsPanel.classList.contains("open")&&!e.target.closest("#chatToolsWrap"))closeChatTools();});
+      document.addEventListener("keydown",e=>{if(e.key==="Escape")closeChatTools();});
+      window.addEventListener("resize",closeChatTools);
+    }
     function openSettingsModal(){if(typeof populateTermsSettings==="function")populateTermsSettings(); if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels(); openModal("settingsModal");}
     document.getElementById("settingsBtn").onclick=openSettingsModal;
     document.getElementById("systemBtn").onclick=openSystemModal;
@@ -492,6 +709,7 @@
     themeBtn.onclick=async()=>{prefs.dark=!prefs.dark; applyPrefs(); await savePrefs();};
     document.getElementById("message").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.getElementById("messageForm").requestSubmit();}});
     document.getElementById("addMemberBtn").onclick=()=>{resetMemberModal();openModal("memberModal");}; document.getElementById("addRoomBtn").onclick=()=>{resetRoomModal();openModal("roomModal");}; document.getElementById("addPrivateBtn").onclick=()=>openPrivateModal(); document.getElementById("dailyBtn").onclick=()=>openModal("dailyModal"); document.getElementById("roomBgQuickBtn").onclick=()=>editRoom(currentRoomId);
+    const longScreenshotBtn=document.getElementById("longScreenshotBtn"); if(longScreenshotBtn)longScreenshotBtn.onclick=saveCurrentRoomLongScreenshot;
     document.getElementById("pollBtn").onclick=()=>{if(typeof ensurePollFormDefaults==="function")ensurePollFormDefaults(); else if(!document.getElementById("pollDeadline").value){const d=new Date(Date.now()+60*60*1000); d.setSeconds(0,0); document.getElementById("pollDeadline").value=d.toISOString().slice(0,16);} renderPolls(); if(typeof applyTermsToStaticLabels==="function")applyTermsToStaticLabels(); openModal("pollModal");};
     const frontingBtn=document.getElementById("frontingBtn"); if(frontingBtn)frontingBtn.onclick=openFrontingModal;
     const arrivalBtn=document.getElementById("arrivalBtn"); if(arrivalBtn)arrivalBtn.onclick=()=>window.openArrivalModal&&window.openArrivalModal();
